@@ -19,7 +19,7 @@ const pageVariants = {
 
 const pageTransition = {
   duration: 0.18,
-  ease: 'easeOut',
+  ease: 'easeOut' as const,
 };
 
 function AnimatedRoutes() {
