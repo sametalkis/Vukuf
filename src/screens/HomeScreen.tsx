@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { hexToHue } from '../utils/colors';
 import RunningTimerCard from '../components/RunningTimerCard';
 import ActivityCard from '../components/ActivityCard';
 import AddActivityModal from '../components/AddActivityModal';
@@ -41,10 +42,11 @@ export default function HomeScreen() {
     };
 
     const gridActivities = useMemo(() => {
+        const sorted = [...recordTypes].sort((a, b) => hexToHue(a.color) - hexToHue(b.color));
         if (showUntrackedTime) {
-            return [...recordTypes, { id: 'untracked', name: 'Untracked Time', color: '#6b7280', icon: 'Clock' as any }];
+            return [...sorted, { id: 'untracked', name: 'Untracked Time', color: '#6b7280', icon: 'Clock' as any }];
         }
-        return recordTypes;
+        return sorted;
     }, [recordTypes, showUntrackedTime]);
 
     return (
@@ -86,7 +88,7 @@ export default function HomeScreen() {
                                     initial={{ opacity: 0, scale: 0.8 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     exit={{ opacity: 0, scale: 0.8 }}
-                                    className="relative touch-none"
+                                    className="relative"
                                 >
                                     <ActivityCard
                                         activity={activity}

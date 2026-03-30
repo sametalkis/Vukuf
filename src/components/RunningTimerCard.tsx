@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Square } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getContrastColor } from '../utils/colors';
+import { formatTime } from '../utils/time';
 import DynamicIcon from './DynamicIcon';
 
 function formatElapsed(seconds: number): string {
@@ -10,13 +10,21 @@ function formatElapsed(seconds: number): string {
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     if (h > 0) {
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        return `${h}h ${m}m ${s}s`;
     }
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}m ${s}s`;
+}
+
+function formatTodayDuration(seconds: number): string {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
 }
 
 export default function RunningTimerCard() {
-    const { runningRecord, stopTimer, recordTypes } = useStore();
+    const { runningRecord, stopTimer, recordTypes, records } = useStore();
     const [elapsed, setElapsed] = useState(0);
 
     useEffect(() => {
@@ -29,10 +37,38 @@ export default function RunningTimerCard() {
             setElapsed(diff);
         };
 
-        tick(); // immediate update
+        tick();
         const interval = setInterval(tick, 1000);
         return () => clearInterval(interval);
     }, [runningRecord]);
+
+    // Calculate today's total for this activity (completed records + current session)
+    const todayTotal = useMemo(() => {
+        if (!runningRecord) return 0;
+
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+        const completedToday = records
+            .filter((r) => {
+                if (r.recordTypeId !== runningRecord.recordTypeId) return false;
+                const start = new Date(r.startTime).getTime();
+                const end = new Date(r.endTime).getTime();
+                // Record overlaps with today
+                return end >= todayStart && start < todayStart + 86400000;
+            })
+            .reduce((sum, r) => {
+                const start = Math.max(new Date(r.startTime).getTime(), todayStart);
+                const end = Math.min(new Date(r.endTime).getTime(), todayStart + 86400000);
+                return sum + Math.max(0, Math.floor((end - start) / 1000));
+            }, 0);
+
+        // Add current running session's contribution to today
+        const runStart = Math.max(new Date(runningRecord.startTime).getTime(), todayStart);
+        const runningToday = Math.max(0, Math.floor((Date.now() - runStart) / 1000));
+
+        return completedToday + runningToday;
+    }, [runningRecord, records, elapsed]); // elapsed dependency keeps it fresh every second
 
     if (!runningRecord) return null;
 
@@ -47,6 +83,7 @@ export default function RunningTimerCard() {
 
     const contrast = getContrastColor(activity.color);
     const isUntracked = activity.id === 'untracked';
+    const startTimeStr = formatTime(runningRecord.startTime);
 
     if (isUntracked) {
         return (
@@ -96,66 +133,47 @@ export default function RunningTimerCard() {
     }
 
     return (
-        <motion.div
+        <motion.button
+            onClick={stopTimer}
             initial={{ opacity: 0, y: -16, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -16, scale: 0.97 }}
             transition={{ type: 'spring', damping: 20, stiffness: 260 }}
-            className="mx-4 mt-4 rounded-2xl p-4 shadow-lg"
+            className="mx-4 mt-4 rounded-2xl px-4 py-3 shadow-lg w-[calc(100%-2rem)] text-left cursor-pointer active:scale-[0.98] transition-transform"
             style={{ backgroundColor: activity.color }}
         >
-            <div className="flex items-center gap-3">
-                {/* Icon */}
-                <div
-                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
-                >
-                    <DynamicIcon name={activity.icon} size={22} color={contrast} />
+            <div className="flex items-center justify-between">
+                {/* Left side: icon + name + start time */}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div
+                        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
+                    >
+                        <DynamicIcon name={activity.icon} size={18} color={contrast} />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-sm font-bold truncate" style={{ color: contrast }}>
+                            {activity.name}
+                        </p>
+                        <p className="text-xs font-medium opacity-70" style={{ color: contrast }}>
+                            {startTimeStr}
+                        </p>
+                    </div>
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium opacity-75" style={{ color: contrast }}>
-                        Running
-                    </p>
-                    <p className="text-base font-bold truncate" style={{ color: contrast }}>
-                        {activity.name}
-                    </p>
-                </div>
-
-                {/* Elapsed */}
-                <div className="text-right flex-shrink-0">
+                {/* Right side: total elapsed + today */}
+                <div className="text-right flex-shrink-0 ml-3">
                     <p
-                        className="text-2xl font-mono font-bold tabular-nums"
+                        className="text-base font-bold tabular-nums"
                         style={{ color: contrast }}
                     >
                         {formatElapsed(elapsed)}
                     </p>
+                    <p className="text-xs font-medium opacity-70" style={{ color: contrast }}>
+                        today {formatTodayDuration(todayTotal)}
+                    </p>
                 </div>
-
-                {/* Stop Button */}
-                <button
-                    onClick={stopTimer}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform active:scale-90"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.20)' }}
-                >
-                    <Square size={18} fill={contrast} color={contrast} />
-                </button>
             </div>
-
-            {/* Pulsing indicator */}
-            <div className="flex items-center gap-1.5 mt-2 ml-0.5">
-                <span
-                    className="w-2 h-2 rounded-full animate-pulse"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.7)' }}
-                />
-                <span
-                    className="text-xs font-medium opacity-60"
-                    style={{ color: contrast }}
-                >
-                    Tracking time...
-                </span>
-            </div>
-        </motion.div>
+        </motion.button>
     );
 }

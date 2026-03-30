@@ -30,3 +30,25 @@ export function getContrastColor(hexColor: string): string {
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return luminance > 0.55 ? '#111827' : '#ffffff';
 }
+
+// Converts hex color to HSL hue (0-360) for sorting by color
+export function hexToHue(hexColor: string): number {
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.slice(0, 2), 16) / 255;
+    const g = parseInt(hex.slice(2, 4), 16) / 255;
+    const b = parseInt(hex.slice(4, 6), 16) / 255;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+
+    if (d === 0) return 0;
+
+    let h: number;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+
+    h = Math.round(h * 60);
+    return h < 0 ? h + 360 : h;
+}
