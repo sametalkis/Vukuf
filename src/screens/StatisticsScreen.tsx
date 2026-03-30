@@ -7,8 +7,8 @@ import type { ViewMode } from '../components/DateSelectorBar';
 import DynamicIcon from '../components/DynamicIcon';
 
 const RADIAN = Math.PI / 180;
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, payload }: any) => {
-    if (percent < 0.05) return null; // Don't show icon if slice is too small
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload }: any) => {
+    if (payload.percent < 3) return null; // Hide icon if slice is too small (<10%) to avoid overlap
 
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
