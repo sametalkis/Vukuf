@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check } from 'lucide-react';
+import { X, Check, Trash2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { PRESET_COLORS, getContrastColor } from '../utils/colors';
 import { AVAILABLE_ICONS } from '../utils/icons';
@@ -14,7 +14,7 @@ interface AddActivityModalProps {
 }
 
 export default function AddActivityModal({ isOpen, onClose, editingId }: AddActivityModalProps) {
-    const { addRecordType, updateRecordType, recordTypes } = useStore();
+    const { addRecordType, updateRecordType, deleteRecordType, recordTypes } = useStore();
     const nameRef = useRef<HTMLInputElement>(null);
 
     const [name, setName] = useState('');
@@ -67,6 +67,13 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
             addRecordType({ name: name.trim(), color, icon });
         }
         onClose();
+    };
+
+    const handleDelete = () => {
+        if (editingId && window.confirm('Bu aktiviteyi kaldırmak istediğinden emin misin? Ona bağlı olan geçmiş tüm kayıtlar da kalıcı olarak silinecek!')) {
+            deleteRecordType(editingId);
+            onClose();
+        }
     };
 
     const modalContent = (
@@ -259,6 +266,19 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Delete Button */}
+                                    {editingId && (
+                                        <div className="pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleDelete}
+                                                className="w-full flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 py-3.5 rounded-xl text-sm font-semibold transition-colors"
+                                            >
+                                                <Trash2 size={16} /> Delete Activity
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Fixed Submit Footer */}

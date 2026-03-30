@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { hexToHue } from '../utils/colors';
 import RunningTimerCard from '../components/RunningTimerCard';
@@ -8,32 +8,18 @@ import ActivityCard from '../components/ActivityCard';
 import AddActivityModal from '../components/AddActivityModal';
 
 export default function HomeScreen() {
-    const { recordTypes, runningRecord, startTimer, deleteRecordType, showUntrackedTime } = useStore();
+    const { recordTypes, runningRecord, startTimer, showUntrackedTime } = useStore();
 
     const [showModal, setShowModal] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [contextMenuId, setContextMenuId] = useState<string | null>(null);
 
     const handleCardClick = (id: string) => {
-        setContextMenuId(null);
         startTimer(id);
-    };
-
-    const handleLongPress = (id: string) => {
-        setContextMenuId(id);
     };
 
     const handleEdit = (id: string) => {
         setEditingId(id);
         setShowModal(true);
-        setContextMenuId(null);
-    };
-
-    const handleDelete = (id: string) => {
-        if (window.confirm('Bu aktiviteyi kaldırmak istediğinden emin misin? Ona bağlı olan geçmiş tüm kayıtlar da kalıcı olarak silinecek!')) {
-            deleteRecordType(id);
-        }
-        setContextMenuId(null);
     };
 
     const openAddModal = () => {
@@ -93,53 +79,14 @@ export default function HomeScreen() {
                                     <ActivityCard
                                         activity={activity}
                                         onClick={() => handleCardClick(activity.id)}
-                                        onLongPress={() => activity.id !== 'untracked' ? handleLongPress(activity.id) : undefined}
+                                        onLongPress={() => activity.id !== 'untracked' ? handleEdit(activity.id) : undefined}
                                         isRunning={runningRecord?.recordTypeId === activity.id}
                                     />
-
-                                    {/* Context Menu Overlay */}
-                                    <AnimatePresence>
-                                        {contextMenuId === activity.id && activity.id !== 'untracked' && (
-                                            <motion.div
-                                                initial={{ opacity: 0, scale: 0.85 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.85 }}
-                                                className="absolute inset-0 rounded-2xl z-10 flex flex-col items-center justify-center gap-2 bg-black/60 backdrop-blur-sm"
-                                            >
-                                                <button
-                                                    onClick={() => handleEdit(activity.id)}
-                                                    className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                                                >
-                                                    <Pencil size={12} /> Edit
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(activity.id)}
-                                                    className="flex items-center gap-1.5 bg-red-500/80 hover:bg-red-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                                                >
-                                                    <Trash2 size={12} /> Delete
-                                                </button>
-                                                <button
-                                                    onClick={() => setContextMenuId(null)}
-                                                    className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-                                                >
-                                                    <X size={12} /> Cancel
-                                                </button>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
                                 </motion.div>
                             ))}
                         </AnimatePresence>
                     </div>
                 </div>
-            )}
-
-            {/* Dismiss context menu on outside tap */}
-            {contextMenuId && (
-                <div
-                    className="fixed inset-0 z-[5]"
-                    onClick={() => setContextMenuId(null)}
-                />
             )}
 
             {/* FAB */}
