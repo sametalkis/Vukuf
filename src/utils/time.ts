@@ -22,8 +22,11 @@ export function formatTime(iso: string): string {
 /**
  * Splits a single record spanning multiple days into an array of smaller records,
  * bounded safely by the 00:00:00 midnight cutoff mathematically per-day.
+ * Attaches originalRecord so editors and actions can access the true interval.
  */
-export function splitRecordByDays<T extends { startTime: string; endTime: string; isRunning?: boolean }>(record: T): T[] {
+export function splitRecordByDays<T extends { startTime: string; endTime: string; isRunning?: boolean }>(
+    record: T
+): (T & { originalRecord?: T; isSplitChunk?: boolean })[] {
     const rStart = new Date(record.startTime).getTime();
     const rEnd = new Date(record.endTime).getTime();
 
@@ -31,10 +34,10 @@ export function splitRecordByDays<T extends { startTime: string; endTime: string
     const startDate = new Date(rStart);
     const endDate = new Date(rEnd);
     if (startDate.toDateString() === endDate.toDateString()) {
-        return [{ ...record }];
+        return [{ ...record, originalRecord: record }];
     }
 
-    const chunks: T[] = [];
+    const chunks: (T & { originalRecord?: T; isSplitChunk?: boolean })[] = [];
     let currentStart = rStart;
 
     while (currentStart < rEnd) {
@@ -50,6 +53,8 @@ export function splitRecordByDays<T extends { startTime: string; endTime: string
             endTime: new Date(endOfChunk).toISOString(),
             duration: Math.max(0, Math.floor((endOfChunk - currentStart) / 1000)),
             ...(record.isRunning ? { isRunning: isLastChunk } : {}),
+            originalRecord: record,
+            isSplitChunk: true,
         });
 
         currentStart = endOfChunk + 1; // Slide smoothly into 00:00:00 of the subsequent day

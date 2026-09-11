@@ -85,7 +85,7 @@ function dayTotal(records: Record[]): string {
 
 // ─── Record Row ────────────────────────────────────────────────────────────────
 function RecordRow({ record, onEdit }: { record: Record & { isRunning?: boolean }; onEdit: () => void }) {
-    const { recordTypes, deleteRecord } = useStore();
+    const { recordTypes } = useStore();
 
     // Live tick for running timer duration
     const [elapsed, setElapsed] = useState(record.duration);
@@ -155,6 +155,22 @@ export default function RecordsScreen() {
     const handleSetSelectedDate = (date: Date) => {
         setSelectedDate(date);
         setLimit(50);
+    };
+
+    const handleEditRecord = (record: any) => {
+        // If this row is a split chunk of a multi-day record, retrieve the true full original record
+        const target = record.originalRecord || record;
+
+        if (runningRecord && runningRecord.id === target.id) {
+            setEditingRecord({
+                ...runningRecord,
+                endTime: now(),
+                isRunning: true,
+            });
+        } else {
+            const storeRecord = records.find(r => r.id === target.id);
+            setEditingRecord(storeRecord || target);
+        }
     };
 
     // ── Filter Records ──
@@ -228,9 +244,9 @@ export default function RecordsScreen() {
                                 <AnimatePresence>
                                     {group.records.map((record) => (
                                         <RecordRow
-                                            key={record.id}
+                                            key={`${record.id}-${record.startTime}`}
                                             record={record}
-                                            onEdit={() => setEditingRecord(record)}
+                                            onEdit={() => handleEditRecord(record)}
                                         />
                                     ))}
                                 </AnimatePresence>

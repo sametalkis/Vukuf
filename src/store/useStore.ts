@@ -144,6 +144,17 @@ export const useStore = create<TimeTrackerStore>()(
                     if (s.runningRecord?.id === id) {
                         return { runningRecord: { ...s.runningRecord, ...data } };
                     }
+                    const exists = s.records.some((r) => r.id === id);
+                    if (!exists && id.startsWith('untracked-')) {
+                        const newRecord: Record = {
+                            id: uuidv4(),
+                            recordTypeId: data.recordTypeId || s.recordTypes[0]?.id || 'untracked',
+                            startTime: data.startTime || now(),
+                            endTime: data.endTime || now(),
+                            duration: durationSeconds(data.startTime || now(), data.endTime || now()),
+                        };
+                        return { records: [...s.records, newRecord] };
+                    }
                     return {
                         records: s.records.map((r) => {
                             if (r.id !== id) return r;
