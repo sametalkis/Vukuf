@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useStore } from '../store/useStore';
-import { getContrastColor } from '../utils/colors';
 import { formatTime } from '../utils/time';
 import DynamicIcon from './DynamicIcon';
 import TrackingCard from './TrackingCard';
@@ -82,7 +81,6 @@ export default function RunningTimerCard() {
         }
     }
 
-    const contrast = getContrastColor(activity.color);
     const isUntracked = activity.id === 'untracked';
     const startTimeStr = formatTime(runningRecord.startTime);
 

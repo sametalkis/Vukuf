@@ -1,14 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Pencil, Clock } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Clock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatDuration, splitRecordByDays } from '../utils/time';
-import DynamicIcon from '../components/DynamicIcon';
 import DateSelectorBar from '../components/DateSelectorBar';
 import type { ViewMode } from '../components/DateSelectorBar';
 import EditRecordScreen from '../components/EditRecordScreen';
 import TrackingCard from '../components/TrackingCard';
-import { getContrastColor } from '../utils/colors';
 import type { Record } from '../types';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -17,16 +15,19 @@ function formatTime(iso: string): string {
     return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+function sameDay(a: Date, b: Date): boolean {
+    return (
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate()
+    );
+}
+
 function getDayLabel(iso: string): string {
     const date = new Date(iso);
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
-
-    const sameDay = (a: Date, b: Date) =>
-        a.getFullYear() === b.getFullYear() &&
-        a.getMonth() === b.getMonth() &&
-        a.getDate() === b.getDate();
 
     if (sameDay(date, today)) return 'Today';
     if (sameDay(date, yesterday)) return 'Yesterday';
@@ -236,9 +237,11 @@ export default function RecordsScreen() {
         const target = record.originalRecord || record;
 
         if (runningRecord && runningRecord.id === target.id) {
+            const nowIso = new Date().toISOString();
             setEditingRecord({
                 ...runningRecord,
-                endTime: now(),
+                endTime: nowIso,
+                duration: Math.max(0, Math.floor((Date.now() - new Date(runningRecord.startTime).getTime()) / 1000)),
                 isRunning: true,
             });
         } else {

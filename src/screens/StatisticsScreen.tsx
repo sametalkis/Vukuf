@@ -1,9 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Clock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatDuration, splitRecordByDays } from '../utils/time';
-import { getContrastColor } from '../utils/colors';
 import DateSelectorBar from '../components/DateSelectorBar';
 import type { ViewMode } from '../components/DateSelectorBar';
 import DynamicIcon from '../components/DynamicIcon';
