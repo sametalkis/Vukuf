@@ -50,7 +50,7 @@ export const useStore = create<TimeTrackerStore>()(
             recordTypes: [],
             records: [],
             runningRecord: null,
-            showUntrackedTime: false,
+            showUntrackedTime: true,
 
             // ── RecordType CRUD ──
             addRecordType: (data) => {

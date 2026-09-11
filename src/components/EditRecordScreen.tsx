@@ -78,6 +78,10 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
     };
 
     const handleDelete = () => {
+        if (record.id.startsWith('untracked-')) {
+            onClose();
+            return;
+        }
         if (window.confirm('Bu kaydı silmek istediğinden emin misin?')) {
             deleteRecord(record.id);
             onClose();
@@ -149,13 +153,15 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                 </div>
 
             <div className="flex flex-col flex-1 overflow-y-auto px-4 py-5 space-y-4">
-                {/* ── Delete Row ── */}
-                <button
-                    onClick={handleDelete}
-                    className="w-full flex items-center justify-center gap-2 bg-[#1f2429] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
-                >
-                    <Trash2 size={16} /> Delete Record
-                </button>
+                {/* ── Delete Row (only for saved records) ── */}
+                {!record.id.startsWith('untracked-') && (
+                    <button
+                        onClick={handleDelete}
+                        className="w-full flex items-center justify-center gap-2 bg-[#1f2429] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
+                    >
+                        <Trash2 size={16} /> Delete Record
+                    </button>
+                )}
 
                 {/* ── Start Time Box ── */}
                 <div className="relative border border-[#2a2a2a] rounded-xl pt-4 pb-3 px-3 mt-4 text-center">
