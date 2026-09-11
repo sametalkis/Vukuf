@@ -13,17 +13,12 @@ export default function SettingsScreen() {
     } = useStore();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const csvInputRef = useRef<HTMLInputElement>(null);
-    const backupInputRef = useRef<HTMLInputElement>(null);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-    const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
-
-    const [csvStatus, setCsvStatus] = useState<'idle' | 'success' | 'error'>('idle');
-    const [csvResult, setCsvResult] = useState<{ imported: number; skipped: number } | null>(null);
-
-    const [backupStatus, setBackupStatus] = useState<'idle' | 'success' | 'error'>('idle');
-    const [backupResult, setBackupResult] = useState<{ imported: number; activities: number; skipped: number } | null>(null);
+    const [importStatus, setImportStatus] = useState<{
+        type: 'idle' | 'success' | 'error';
+        message: string;
+    }>({ type: 'idle', message: '' });
 
     // ── Export ──
     const handleExport = () => {
@@ -37,20 +32,121 @@ export default function SettingsScreen() {
         URL.revokeObjectURL(url);
     };
 
-    // ── Import ──
+    // ── Unified Import ──
     const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        const fileName = file.name.toLowerCase();
         const reader = new FileReader();
+
         reader.onload = (ev) => {
+            const text = (ev.target?.result as string) || '';
+            const trimmed = text.trim();
+
             try {
-                importData(ev.target?.result as string);
-                setImportStatus('success');
+                // 1. Check if it's STT Android .backup format
+                if (fileName.endsWith('.backup') || trimmed.startsWith('app simple time tracker')) {
+                    const result = importBackup(text);
+                    if (result.imported > 0 || result.activities > 0) {
+                        setImportStatus({
+                            type: 'success',
+                            message: `✓ ${result.activities} activities, ${result.imported} records imported`,
+                        });
+                    } else {
+                        setImportStatus({
+                            type: 'error',
+                            message: 'No valid data found in .backup file',
+                        });
+                    }
+                }
+                // 2. Check if it's CSV
+                else if (fileName.endsWith('.csv') || (trimmed.toLowerCase().includes('activity name') && trimmed.toLowerCase().includes('time started'))) {
+                    const result = importCSV(text);
+                    if (result.imported > 0) {
+                        setImportStatus({
+                            type: 'success',
+                            message: `✓ ${result.imported} records imported${result.skipped > 0 ? `, ${result.skipped} skipped` : ''}`,
+                        });
+                    } else {
+                        setImportStatus({
+                            type: 'error',
+                            message: 'Format error: "activity name", "time started", "time ended" columns required',
+                        });
+                    }
+                }
+                // 3. Check if it's JSON
+                else if (fileName.endsWith('.json') || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+                    const parsed = JSON.parse(text);
+                    if (parsed.recordTypes && parsed.records !== undefined) {
+                        importData(text);
+                        setImportStatus({
+                            type: 'success',
+                            message: `✓ ${parsed.records.length} records, ${parsed.recordTypes.length} activities imported`,
+                        });
+                    } else {
+                        setImportStatus({
+                            type: 'error',
+                            message: 'Invalid JSON backup format',
+                        });
+                    }
+                }
+                // 4. Fallback attempt: try JSON, then Backup, then CSV
+                else {
+                    let handled = false;
+                    try {
+                        const parsed = JSON.parse(text);
+                        if (parsed.recordTypes && parsed.records !== undefined) {
+                            importData(text);
+                            setImportStatus({
+                                type: 'success',
+                                message: `✓ ${parsed.records.length} records, ${parsed.recordTypes.length} activities imported`,
+                            });
+                            handled = true;
+                        }
+                    } catch {}
+
+                    if (!handled) {
+                        const backupRes = importBackup(text);
+                        if (backupRes.imported > 0 || backupRes.activities > 0) {
+                            setImportStatus({
+                                type: 'success',
+                                message: `✓ ${backupRes.activities} activities, ${backupRes.imported} records imported`,
+                            });
+                            handled = true;
+                        }
+                    }
+
+                    if (!handled) {
+                        const csvRes = importCSV(text);
+                        if (csvRes.imported > 0) {
+                            setImportStatus({
+                                type: 'success',
+                                message: `✓ ${csvRes.imported} records imported`,
+                            });
+                            handled = true;
+                        }
+                    }
+
+                    if (!handled) {
+                        setImportStatus({
+                            type: 'error',
+                            message: 'Unsupported format (.json, .csv, .backup supported)',
+                        });
+                    }
+                }
             } catch {
-                setImportStatus('error');
+                setImportStatus({
+                    type: 'error',
+                    message: 'Failed to read or parse file',
+                });
             }
-            setTimeout(() => setImportStatus('idle'), 2500);
+
+            setTimeout(() => {
+                setImportStatus({ type: 'idle', message: '' });
+            }, 4500);
         };
+
         reader.readAsText(file);
         e.target.value = ''; // reset
     };
@@ -59,47 +155,6 @@ export default function SettingsScreen() {
     const handleClear = () => {
         clearAllData();
         setShowClearConfirm(false);
-    };
-
-    // ── CSV Import ──
-    const handleCSVFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const result = importCSV(ev.target?.result as string);
-                setCsvResult(result);
-                setCsvStatus(result.imported > 0 ? 'success' : 'error');
-            } catch {
-                setCsvStatus('error');
-                setCsvResult(null);
-            }
-            setTimeout(() => { setCsvStatus('idle'); setCsvResult(null); }, 4000);
-        };
-        reader.readAsText(file);
-        e.target.value = '';
-    };
-
-    // ── Backup Import ──
-    const handleBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            try {
-                const result = importBackup(ev.target?.result as string);
-                setBackupResult(result);
-                // Even if 0 records imported, if activities imported it's a success
-                setBackupStatus(result.imported > 0 || result.activities > 0 ? 'success' : 'error');
-            } catch {
-                setBackupStatus('error');
-                setBackupResult(null);
-            }
-            setTimeout(() => { setBackupStatus('idle'); setBackupResult(null); }, 4000);
-        };
-        reader.readAsText(file);
-        e.target.value = '';
     };
 
     return (
@@ -180,96 +235,48 @@ export default function SettingsScreen() {
                             </div>
                         </button>
 
-                        {/* Import JSON */}
+                        {/* Unified Import */}
                         <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="w-full flex items-center gap-4 px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/60 active:bg-gray-100 transition-colors border-b border-gray-100 dark:border-gray-800"
+                            className="w-full flex items-center gap-4 px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/60 active:bg-gray-100 transition-colors"
                         >
-                            <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                                {importStatus === 'success' ? (
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                                importStatus.type === 'success'
+                                    ? 'bg-emerald-100 dark:bg-emerald-900/30'
+                                    : importStatus.type === 'error'
+                                    ? 'bg-red-100 dark:bg-red-900/30'
+                                    : 'bg-blue-100 dark:bg-blue-900/30'
+                            }`}>
+                                {importStatus.type === 'success' ? (
                                     <Check size={18} className="text-emerald-500" />
-                                ) : importStatus === 'error' ? (
+                                ) : importStatus.type === 'error' ? (
                                     <AlertTriangle size={18} className="text-red-500" />
                                 ) : (
                                     <Upload size={18} className="text-blue-600 dark:text-blue-400" />
                                 )}
                             </div>
                             <div className="flex-1 text-left">
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Import JSON</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Import Data</p>
                                 <p className="text-xs mt-0.5">
-                                    {importStatus === 'success' ? (
-                                        <span className="text-emerald-500">Imported successfully!</span>
-                                    ) : importStatus === 'error' ? (
-                                        <span className="text-red-500">Invalid file format</span>
+                                    {importStatus.type === 'success' ? (
+                                        <span className="text-emerald-500 font-medium">{importStatus.message}</span>
+                                    ) : importStatus.type === 'error' ? (
+                                        <span className="text-red-500 font-medium">{importStatus.message}</span>
                                     ) : (
-                                        <span className="text-gray-400 dark:text-gray-500">Upload a previously exported JSON backup</span>
-                                    )}
-                                </p>
-                            </div>
-                        </button>
-                        <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImportFile} />
-
-                        {/* Import CSV (Simple Time Tracker format) */}
-                        <button
-                            onClick={() => csvInputRef.current?.click()}
-                            className="w-full flex items-center gap-4 px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/60 active:bg-gray-100 transition-colors border-b border-gray-100 dark:border-gray-800"
-                        >
-                            <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center flex-shrink-0">
-                                {csvStatus === 'success' ? (
-                                    <Check size={18} className="text-emerald-500" />
-                                ) : csvStatus === 'error' ? (
-                                    <AlertTriangle size={18} className="text-red-500" />
-                                ) : (
-                                    <Upload size={18} className="text-violet-600 dark:text-violet-400" />
-                                )}
-                            </div>
-                            <div className="flex-1 text-left">
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Import CSV <span className="text-xs font-normal text-gray-400">(Simple Time Tracker)</span></p>
-                                <p className="text-xs mt-0.5">
-                                    {csvStatus === 'success' && csvResult ? (
-                                        <span className="text-emerald-500">
-                                            ✓ {csvResult.imported} kayıt eklendi{csvResult.skipped > 0 ? `, ${csvResult.skipped} atlandı` : ''}
+                                        <span className="text-gray-400 dark:text-gray-500">
+                                            Restore from JSON, CSV or .backup file
                                         </span>
-                                    ) : csvStatus === 'error' ? (
-                                        <span className="text-red-500">Format hatası — activity name, time started, time ended kolonları gerekli</span>
-                                    ) : (
-                                        <span className="text-gray-400 dark:text-gray-500">STT CSV dışa aktarma dosyasını yükle</span>
                                     )}
                                 </p>
                             </div>
                         </button>
-                        <input ref={csvInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVFile} />
-
-                        {/* Import Backup (Simple Time Tracker format) */}
-                        <button
-                            onClick={() => backupInputRef.current?.click()}
-                            className="w-full flex items-center gap-4 px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/60 active:bg-gray-100 transition-colors"
-                        >
-                            <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
-                                {backupStatus === 'success' ? (
-                                    <Check size={18} className="text-emerald-500" />
-                                ) : backupStatus === 'error' ? (
-                                    <AlertTriangle size={18} className="text-red-500" />
-                                ) : (
-                                    <Upload size={18} className="text-amber-600 dark:text-amber-400" />
-                                )}
-                            </div>
-                            <div className="flex-1 text-left">
-                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Import Backup <span className="text-xs font-normal text-gray-400">(.backup)</span></p>
-                                <p className="text-xs mt-0.5">
-                                    {backupStatus === 'success' && backupResult ? (
-                                        <span className="text-emerald-500">
-                                            ✓ {backupResult.activities} aktivite, {backupResult.imported} kayıt eklendi
-                                        </span>
-                                    ) : backupStatus === 'error' ? (
-                                        <span className="text-red-500">Geçersiz format — STT .backup dosyası gerekli</span>
-                                    ) : (
-                                        <span className="text-gray-400 dark:text-gray-500">Android app .backup yedeğini yükle</span>
-                                    )}
-                                </p>
-                            </div>
-                        </button>
-                        <input ref={backupInputRef} type="file" accept=".backup" className="hidden" onChange={handleBackupFile} />
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".json,.csv,.backup"
+                            className="hidden"
+                            onChange={handleImportFile}
+                        />
                     </div>
                 </section>
 
