@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Trash2, Check, Clock, ChevronDown } from 'lucide-react';
+import { ChevronLeft, Trash2, Check, Clock, ChevronDown, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getContrastColor } from '../utils/colors';
 import DynamicIcon from './DynamicIcon';
@@ -84,34 +84,69 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
         }
     };
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
     const content = (
         <motion.div
-            className="fixed inset-0 z-50 bg-[#121212] flex flex-col text-gray-200"
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
         >
-            {/* ── Header ── */}
+            {/* Backdrop on desktop */}
             <div
-                className="flex items-center justify-between px-4 py-3 shadow-md"
-                style={{ backgroundColor: activity.color, color: contrast }}
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
+                onClick={onClose}
+            />
+
+            {/* Modal Dialog (Native full-screen on mobile, centered modal card on desktop) */}
+            <motion.div
+                className="relative z-10 w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md bg-[#121212] flex flex-col text-gray-200 sm:rounded-3xl sm:shadow-2xl sm:border sm:border-neutral-800 overflow-hidden"
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center gap-3 relative z-10">
-                    <button onClick={onClose} className="p-1 -ml-1 rounded-full hover:bg-black/10 active:bg-black/20">
-                        <ChevronLeft size={24} color={contrast} />
-                    </button>
-                    <div>
-                        <h2 className="text-base font-bold leading-tight">{activity.name}</h2>
-                        <div className="text-xs font-medium opacity-90 tracking-wide mt-0.5" style={{ color: contrast }}>
-                            {formatTime(start.toISOString())} – {record.isRunning ? 'Running' : formatTime(end.toISOString())}
+                {/* ── Header ── */}
+                <div
+                    className="flex items-center justify-between px-4 py-3.5 shadow-md flex-shrink-0"
+                    style={{ backgroundColor: activity.color, color: contrast }}
+                >
+                    <div className="flex items-center gap-3 relative z-10">
+                        <button
+                            onClick={onClose}
+                            className="p-1 -ml-1 rounded-full hover:bg-black/15 active:bg-black/25 transition-colors"
+                        >
+                            <ChevronLeft size={24} color={contrast} />
+                        </button>
+                        <div>
+                            <h2 className="text-base font-bold leading-tight">{activity.name}</h2>
+                            <div className="text-xs font-medium opacity-90 tracking-wide mt-0.5" style={{ color: contrast }}>
+                                {formatTime(start.toISOString())} – {record.isRunning ? 'Running' : formatTime(end.toISOString())}
+                            </div>
                         </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <div className="text-base font-bold tracking-tight">
+                            {record.isRunning ? 'Active' : formatDuration(start.toISOString(), end.toISOString())}
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="hidden sm:flex p-1 rounded-full hover:bg-black/15 active:bg-black/25 transition-colors ml-1"
+                            title="Close"
+                        >
+                            <X size={20} color={contrast} />
+                        </button>
+                    </div>
                 </div>
-                <div className="text-base font-bold tracking-tight">
-                    {record.isRunning ? 'Active' : formatDuration(start.toISOString(), end.toISOString())}
-                </div>
-            </div>
 
             <div className="flex flex-col flex-1 overflow-y-auto px-4 py-5 space-y-4">
                 {/* ── Delete Row ── */}
@@ -285,15 +320,16 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
             </div>
 
             {/* ── Bottom Save Button ── */}
-            <div className="p-4 bg-[#121212] flex-shrink-0">
+            <div className="p-4 bg-[#121212] border-t border-[#1e1e1e] flex-shrink-0">
                 <button
                     onClick={handleSave}
-                    className="w-full bg-[#1e2328] hover:bg-[#2c333a] py-4 rounded-[14px] text-gray-300 font-bold text-sm tracking-widest uppercase active:scale-[0.98] transition-all"
+                    className="w-full bg-[#1e2328] hover:bg-[#2c333a] py-4 rounded-[14px] text-gray-300 font-bold text-sm tracking-widest uppercase active:scale-[0.98] transition-all cursor-pointer"
                 >
                     Save
                 </button>
             </div>
         </motion.div>
+    </motion.div>
     );
 
     if (typeof document === 'undefined') return null;
