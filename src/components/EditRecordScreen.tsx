@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Trash2, ChevronDown } from 'lucide-react';
+import { ChevronLeft, Trash2, Check, Clock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getContrastColor } from '../utils/colors';
+import DynamicIcon from './DynamicIcon';
 import type { Record } from '../types';
 
 interface EditRecordScreenProps {
@@ -176,30 +177,74 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                     </div>
                 </div>
 
-                {/* ── Selectors Dropdowns ── */}
-                <div className="space-y-2 mt-4 pb-10">
-                    <div className="relative border border-[#2a2a2a] rounded-xl p-3 flex items-center justify-between bg-[#151515]">
-                        <span className="text-gray-400 text-sm font-medium">Activity</span>
-                        <div className="flex items-center gap-2">
-                            <div
-                                className="flex items-center rounded-lg px-2 py-1 gap-1"
-                                style={{ backgroundColor: activity.color, color: contrast }}
-                            >
-                                <ChevronLeft size={14} className="opacity-70" />
-                                <ChevronRight size={14} className="opacity-70" />
+                {/* ── Activity Grid (Direct, Just Like Home Screen) ── */}
+                <div className="space-y-2 mt-4 pb-6">
+                    <span className="text-xs uppercase tracking-wider font-semibold text-neutral-400 block px-1">
+                        Activity
+                    </span>
+
+                    <div className="grid grid-cols-4 gap-2">
+                        {recordTypes.map((rt) => {
+                            const isSelected = rt.id === activityId;
+                            const rtContrast = getContrastColor(rt.color);
+
+                            return (
+                                <motion.button
+                                    key={rt.id}
+                                    type="button"
+                                    whileTap={{ scale: 0.93 }}
+                                    onClick={() => setActivityId(rt.id)}
+                                    className={`relative w-full aspect-square rounded-xl flex flex-col items-center justify-center gap-1 shadow-sm transition-all overflow-hidden select-none cursor-pointer ${
+                                        isSelected
+                                            ? 'ring-4 ring-white ring-offset-2 ring-offset-[#121212] scale-[1.03] z-10'
+                                            : 'opacity-80 hover:opacity-100'
+                                    }`}
+                                    style={{ backgroundColor: rt.color }}
+                                >
+                                    {/* Content */}
+                                    <div className="flex-1 flex flex-col items-center justify-center gap-1.5 w-full">
+                                        <DynamicIcon name={rt.icon} size={26} color={rtContrast} />
+                                        <span
+                                            className="text-[11px] font-semibold text-center leading-tight px-1 w-full truncate"
+                                            style={{ color: rtContrast }}
+                                        >
+                                            {rt.name}
+                                        </span>
+                                    </div>
+
+                                    {/* Selected check badge */}
+                                    {isSelected && (
+                                        <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-white flex items-center justify-center text-black shadow-sm">
+                                            <Check size={10} strokeWidth={3} />
+                                        </div>
+                                    )}
+                                </motion.button>
+                            );
+                        })}
+
+                        {/* Untracked Option */}
+                        <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.93 }}
+                            onClick={() => setActivityId('untracked')}
+                            className={`relative w-full aspect-square rounded-xl flex flex-col items-center justify-center gap-1 shadow-sm transition-all overflow-hidden select-none cursor-pointer border-2 border-dashed border-neutral-700 bg-neutral-900 text-neutral-300 ${
+                                activityId === 'untracked'
+                                    ? 'ring-4 ring-white ring-offset-2 ring-offset-[#121212] scale-[1.03] z-10'
+                                    : 'opacity-70 hover:opacity-100'
+                            }`}
+                        >
+                            <div className="flex-1 flex flex-col items-center justify-center gap-1.5 w-full">
+                                <Clock size={24} className="text-neutral-400" />
+                                <span className="text-[11px] font-semibold text-center leading-tight px-1 w-full truncate text-neutral-400">
+                                    Untracked
+                                </span>
                             </div>
-                            <select
-                                value={activityId}
-                                onChange={(e) => setActivityId(e.target.value)}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            >
-                                {record.recordTypeId === 'untracked' && <option value="untracked">Untracked Time</option>}
-                                {recordTypes.map(rt => (
-                                    <option key={rt.id} value={rt.id}>{rt.name}</option>
-                                ))}
-                            </select>
-                            <ChevronDown size={18} className="text-gray-500 pointer-events-none" />
-                        </div>
+                            {activityId === 'untracked' && (
+                                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-white flex items-center justify-center text-black shadow-sm">
+                                    <Check size={10} strokeWidth={3} />
+                                </div>
+                            )}
+                        </motion.button>
                     </div>
                 </div>
             </div>

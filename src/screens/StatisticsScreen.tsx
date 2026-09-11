@@ -1,10 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Clock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { formatDuration, splitRecordByDays } from '../utils/time';
+import { getContrastColor } from '../utils/colors';
 import DateSelectorBar from '../components/DateSelectorBar';
 import type { ViewMode } from '../components/DateSelectorBar';
 import DynamicIcon from '../components/DynamicIcon';
+import TrackingCard from '../components/TrackingCard';
 
 const RADIAN = Math.PI / 180;
 const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload }: any) => {
@@ -40,6 +43,14 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
             <p className="text-xs text-gray-500 dark:text-gray-400">{formatDuration(payload[0].value)}</p>
         </div>
     );
+}
+
+function formatTodayDuration(seconds: number): string {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0 && m > 0) return `${h}h ${m}m`;
+    if (h > 0) return `${h}h`;
+    return `${m}m`;
 }
 
 export default function StatisticsScreen() {
@@ -163,43 +174,26 @@ export default function StatisticsScreen() {
                         </div>
                     </div>
 
-                    {/* Legend / List */}
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-800/50">
-                        {stats.map((item, idx) => (
-                            <div
+                    {/* Section Header */}
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Activities</span>
+                        <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+                            {stats.length} {stats.length === 1 ? 'activity' : 'activities'}
+                        </span>
+                    </div>
+
+                    {/* Records-style Cards */}
+                    <div className="space-y-2">
+                        {stats.map((item) => (
+                            <TrackingCard
                                 key={item.id}
-                                className={`flex items-center gap-3 px-4 py-3.5 ${idx < stats.length - 1 ? 'border-b border-gray-100 dark:border-gray-800' : ''
-                                    }`}
-                            >
-                                {/* Color swatch */}
-                                <div
-                                    className="w-3.5 h-3.5 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: item.color }}
-                                />
-
-                                {/* Name */}
-                                <span className="flex-1 text-[15px] font-medium text-gray-800 dark:text-gray-200 truncate">
-                                    {item.name}
-                                </span>
-
-                                {/* Duration */}
-                                <span className="text-[15px] font-bold text-gray-700 dark:text-gray-300 flex-shrink-0">
-                                    {formatDuration(item.duration)}
-                                </span>
-
-                                {/* Percent bar + text */}
-                                <div className="flex items-center gap-2.5 w-24 flex-shrink-0">
-                                    <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full transition-all duration-500"
-                                            style={{ width: `${item.percent}%`, backgroundColor: item.color }}
-                                        />
-                                    </div>
-                                    <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 w-8 text-right tabular-nums">
-                                        {formatPercent(item.percent)}
-                                    </span>
-                                </div>
-                            </div>
+                                name={item.name}
+                                icon={item.icon}
+                                color={item.color}
+                                subtitleLeft={formatPercent(item.percent)}
+                                titleRight={formatDuration(item.duration)}
+                                subtitleRight={`today ${formatTodayDuration(item.duration)}`}
+                            />
                         ))}
                     </div>
                 </div>

@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import { getContrastColor } from '../utils/colors';
 import { formatTime } from '../utils/time';
 import DynamicIcon from './DynamicIcon';
+import TrackingCard from './TrackingCard';
 
 function formatElapsed(seconds: number): string {
     const h = Math.floor(seconds / 3600);
@@ -133,47 +134,22 @@ export default function RunningTimerCard() {
     }
 
     return (
-        <motion.button
-            onClick={stopTimer}
+        <motion.div
             initial={{ opacity: 0, y: -16, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -16, scale: 0.97 }}
             transition={{ type: 'spring', damping: 20, stiffness: 260 }}
-            className="mx-4 mt-4 rounded-2xl px-4 py-3 shadow-lg w-[calc(100%-2rem)] text-left cursor-pointer active:scale-[0.98] transition-transform"
-            style={{ backgroundColor: activity.color }}
+            className="mx-4 mt-4"
         >
-            <div className="flex items-center justify-between">
-                {/* Left side: icon + name + start time */}
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
-                    >
-                        <DynamicIcon name={activity.icon} size={18} color={contrast} />
-                    </div>
-                    <div className="min-w-0">
-                        <p className="text-sm font-bold truncate" style={{ color: contrast }}>
-                            {activity.name}
-                        </p>
-                        <p className="text-xs font-medium opacity-70" style={{ color: contrast }}>
-                            {startTimeStr}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Right side: total elapsed + today */}
-                <div className="text-right flex-shrink-0 ml-3">
-                    <p
-                        className="text-base font-bold tabular-nums"
-                        style={{ color: contrast }}
-                    >
-                        {formatElapsed(elapsed)}
-                    </p>
-                    <p className="text-xs font-medium opacity-70" style={{ color: contrast }}>
-                        today {formatTodayDuration(todayTotal)}
-                    </p>
-                </div>
-            </div>
-        </motion.button>
+            <TrackingCard
+                name={activity.name}
+                icon={activity.icon}
+                color={activity.color}
+                subtitleLeft={startTimeStr}
+                titleRight={formatElapsed(elapsed)}
+                subtitleRight={`today ${formatTodayDuration(todayTotal)}`}
+                onClick={stopTimer}
+            />
+        </motion.div>
     );
 }
