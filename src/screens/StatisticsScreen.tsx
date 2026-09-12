@@ -4,10 +4,12 @@ import { useStore } from '../store/useStore';
 import { formatDuration, splitRecordByDays } from '../utils/time';
 import DateSelectorBar from '../components/DateSelectorBar';
 import type { ViewMode } from '../components/DateSelectorBar';
+import { Share2 } from 'lucide-react';
 import DynamicIcon from '../components/DynamicIcon';
 import TrackingCard from '../components/TrackingCard';
 import ActivityDetailModal from '../components/ActivityDetailModal';
 import ActivityHeatmap from '../components/ActivityHeatmap';
+import StatisticsExportModal from '../components/StatisticsExportModal';
 import EditRecordScreen from '../components/EditRecordScreen';
 import type { Record as TimeRecord } from '../types';
 
@@ -66,6 +68,22 @@ export default function StatisticsScreen() {
     } | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<(TimeRecord & { isRunning?: boolean }) | null>(null);
+    const [isExportOpen, setIsExportOpen] = useState(false);
+
+    const periodSubtitle = useMemo(() => {
+        if (viewMode === 'day') {
+            const today = new Date();
+            if (selectedDate.toDateString() === today.toDateString()) return 'Bugün';
+            return selectedDate.toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short' });
+        }
+        if (viewMode === 'month') {
+            return selectedDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+        }
+        if (viewMode === 'year') {
+            return `${selectedDate.getFullYear()}`;
+        }
+        return 'Tüm Zamanlar';
+    }, [viewMode, selectedDate]);
 
     const handleOpenDetail = (item: {
         id: string;
@@ -181,8 +199,30 @@ export default function StatisticsScreen() {
                 </div>
             ) : (
                 <div className="px-4">
+                    {/* Screen Header with Period & Image Export Button */}
+                    <div className="flex items-center justify-between pt-1 pb-1 mb-2 px-1">
+                        <div>
+                            <h1 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
+                                İstatistikler
+                            </h1>
+                            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 mt-0.5">
+                                {periodSubtitle}
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setIsExportOpen(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800 text-xs font-bold text-gray-700 dark:text-gray-200 border border-gray-200/80 dark:border-neutral-800 shadow-xs transition-all active:scale-95 cursor-pointer"
+                            title="İstatistikleri tek sayfa resim olarak dışa aktar"
+                        >
+                            <Share2 size={13} style={{ color: 'var(--primary, #ff9100)' }} />
+                            <span>Resim Paylaş / Kaydet</span>
+                        </button>
+                    </div>
+
                     {/* Doughnut Chart */}
-                    <div className="relative mt-8 mb-6 h-56">
+                    <div className="relative mt-4 mb-6 h-56">
                         <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={224}>
                             <PieChart>
                                 <Pie
@@ -286,6 +326,19 @@ export default function StatisticsScreen() {
                     onClose={() => setEditingRecord(null)}
                 />
             )}
+
+            {/* Statistics Single-Page Image Export Modal */}
+            <StatisticsExportModal
+                isOpen={isExportOpen}
+                onClose={() => setIsExportOpen(false)}
+                viewMode={viewMode}
+                selectedDate={selectedDate}
+                stats={stats}
+                totalDuration={totalDuration}
+                records={records}
+                recordTypes={recordTypes}
+                runningRecord={runningRecord}
+            />
 
             <DateSelectorBar
                 viewMode={viewMode}
