@@ -1,10 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Trash2 } from 'lucide-react';
+import { X, Check, Trash2, Search } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { PRESET_COLORS, getContrastColor } from '../utils/colors';
-import { AVAILABLE_ICONS } from '../utils/icons';
+import {
+    POPULAR_ICONS,
+    ALL_LUCIDE_ICONS,
+    ICON_CATEGORIES,
+    CATEGORY_ICONS,
+    isLucideIcon,
+    type IconCategory,
+} from '../utils/icons';
 import DynamicIcon from './DynamicIcon';
 
 interface AddActivityModalProps {
@@ -23,6 +30,10 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
     const [iconTab, setIconTab] = useState<'grid' | 'emoji'>('grid');
     const [emojiInput, setEmojiInput] = useState('');
 
+    const [iconSearch, setIconSearch] = useState('');
+    const [iconCategory, setIconCategory] = useState<IconCategory>('popular');
+    const [visibleCount, setVisibleCount] = useState(64);
+
     // If editing, populate form
     useEffect(() => {
         if (editingId) {
@@ -32,7 +43,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                 setColor(rt.color);
                 setIcon(rt.icon);
                 // Detect if icon is emoji/text rather than Lucide name
-                const isLucide = AVAILABLE_ICONS.some(i => i.name === rt.icon);
+                const isLucide = isLucideIcon(rt.icon);
                 if (!isLucide) {
                     setIconTab('emoji');
                     setEmojiInput(rt.icon);
@@ -47,8 +58,29 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
             setIcon('Zap');
             setIconTab('grid');
             setEmojiInput('');
+            setIconSearch('');
+            setIconCategory('popular');
+            setVisibleCount(64);
         }
     }, [editingId, recordTypes]);
+
+    useEffect(() => {
+        setVisibleCount(64);
+    }, [iconSearch, iconCategory]);
+
+    const filteredIcons = useMemo(() => {
+        const q = iconSearch.trim().toLowerCase();
+        if (q) {
+            return ALL_LUCIDE_ICONS.filter((iconName) => iconName.toLowerCase().includes(q));
+        }
+        if (iconCategory === 'popular') {
+            return POPULAR_ICONS.map((i) => i.name);
+        }
+        if (iconCategory === 'all') {
+            return ALL_LUCIDE_ICONS;
+        }
+        return CATEGORY_ICONS[iconCategory] || POPULAR_ICONS.map((i) => i.name);
+    }, [iconSearch, iconCategory]);
 
     // Auto-focus name input when modal opens
     useEffect(() => {
@@ -217,21 +249,84 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                         </div>
 
                                         {iconTab === 'grid' ? (
-                                            <div className="grid grid-cols-8 gap-1.5 pb-2">
-                                                {AVAILABLE_ICONS.map(({ name: iconName }) => (
+                                            <div className="space-y-2 pb-2">
+                                                {/* Search bar */}
+                                                <div className="relative">
+                                                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+                                                        <Search size={14} />
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={iconSearch}
+                                                        onChange={(e) => setIconSearch(e.target.value)}
+                                                        placeholder="Search 1,900+ icons (e.g. coffee, book, gym)..."
+                                                        className="w-full pl-8 pr-8 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                                    />
+                                                    {iconSearch && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIconSearch('')}
+                                                            className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* Category Pills */}
+                                                {!iconSearch && (
+                                                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[11px]">
+                                                        {ICON_CATEGORIES.map((cat) => (
+                                                            <button
+                                                                key={cat.id}
+                                                                type="button"
+                                                                onClick={() => setIconCategory(cat.id)}
+                                                                className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors ${iconCategory === cat.id
+                                                                    ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                                                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                                    }`}
+                                                            >
+                                                                {cat.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Icon Grid */}
+                                                <div className="grid grid-cols-8 gap-1.5 max-h-52 overflow-y-auto pr-0.5">
+                                                    {filteredIcons.slice(0, visibleCount).map((iconName) => (
+                                                        <button
+                                                            key={iconName}
+                                                            type="button"
+                                                            title={iconName}
+                                                            onClick={() => setIcon(iconName)}
+                                                            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${icon === iconName
+                                                                ? 'text-white shadow-md scale-105'
+                                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                                }`}
+                                                            style={icon === iconName ? { backgroundColor: color } : {}}
+                                                        >
+                                                            <DynamicIcon name={iconName} size={18} />
+                                                        </button>
+                                                    ))}
+
+                                                    {filteredIcons.length === 0 && (
+                                                        <div className="col-span-8 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
+                                                            No icons found matching "{iconSearch}"
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Load More Button */}
+                                                {filteredIcons.length > visibleCount && (
                                                     <button
-                                                        key={iconName}
                                                         type="button"
-                                                        onClick={() => setIcon(iconName)}
-                                                        className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${icon === iconName
-                                                            ? 'text-white shadow-md scale-105'
-                                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                                                            }`}
-                                                        style={icon === iconName ? { backgroundColor: color } : {}}
+                                                        onClick={() => setVisibleCount((c) => c + 64)}
+                                                        className="w-full py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
                                                     >
-                                                        <DynamicIcon name={iconName} size={18} />
+                                                        Show more (+{Math.min(64, filteredIcons.length - visibleCount)} remaining)
                                                     </button>
-                                                ))}
+                                                )}
                                             </div>
                                         ) : (
                                             <div className="space-y-2 pb-2">

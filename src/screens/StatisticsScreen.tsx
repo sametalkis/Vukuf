@@ -6,6 +6,9 @@ import DateSelectorBar from '../components/DateSelectorBar';
 import type { ViewMode } from '../components/DateSelectorBar';
 import DynamicIcon from '../components/DynamicIcon';
 import TrackingCard from '../components/TrackingCard';
+import ActivityDetailModal from '../components/ActivityDetailModal';
+import EditRecordScreen from '../components/EditRecordScreen';
+import type { Record as TimeRecord } from '../types';
 
 const RADIAN = Math.PI / 180;
 const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload }: any) => {
@@ -43,20 +46,24 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
     );
 }
 
-function formatTodayDuration(seconds: number): string {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    return `${m}m`;
-}
-
 export default function StatisticsScreen() {
     const { records, recordTypes, runningRecord } = useStore();
 
     // View mode constraints
     const [viewMode, setViewMode] = useState<ViewMode>('day');
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+    // Detail modal & edit record modal state
+    const [selectedDetailActivity, setSelectedDetailActivity] = useState<{
+        id: string;
+        name: string;
+        color: string;
+        icon: string;
+        duration: number;
+        sessionCount: number;
+        percent: number;
+    } | null>(null);
+    const [editingRecord, setEditingRecord] = useState<(TimeRecord & { isRunning?: boolean }) | null>(null);
 
     // Live tick for running record on stats screen
     const [tick, setTick] = useState(0);
@@ -103,8 +110,10 @@ export default function StatisticsScreen() {
         const totalAll = filteredRecords.reduce((s, r) => s + r.duration, 0);
 
         const byType: Record<string, number> = {};
+        const countByType: Record<string, number> = {};
         for (const r of filteredRecords) {
             byType[r.recordTypeId] = (byType[r.recordTypeId] ?? 0) + r.duration;
+            countByType[r.recordTypeId] = (countByType[r.recordTypeId] ?? 0) + 1;
         }
 
         const extendedTypes = [...recordTypes, { id: 'untracked', name: 'Untracked Time', color: '#6b7280', icon: 'Clock' }];
@@ -117,12 +126,24 @@ export default function StatisticsScreen() {
                 color: rt.color,
                 icon: rt.icon,
                 duration: byType[rt.id],
+                sessionCount: countByType[rt.id] ?? 0,
                 percent: totalAll > 0 ? (byType[rt.id] / totalAll) * 100 : 0,
             }))
             .sort((a, b) => b.duration - a.duration);
     }, [filteredRecords, recordTypes]);
 
     const totalDuration = stats.reduce((s, a) => s + a.duration, 0);
+
+    // Dynamic data for active detailed activity
+    const activeDetailActivity = useMemo(() => {
+        if (!selectedDetailActivity) return null;
+        return stats.find((s) => s.id === selectedDetailActivity.id) || selectedDetailActivity;
+    }, [stats, selectedDetailActivity]);
+
+    const selectedActivityRecords = useMemo(() => {
+        if (!selectedDetailActivity) return [];
+        return filteredRecords.filter((r) => r.recordTypeId === selectedDetailActivity.id);
+    }, [filteredRecords, selectedDetailActivity]);
 
     return (
         <div className="flex flex-col min-h-screen pt-4 pb-[136px]">
@@ -190,11 +211,36 @@ export default function StatisticsScreen() {
                                 color={item.color}
                                 subtitleLeft={formatPercent(item.percent)}
                                 titleRight={formatDuration(item.duration)}
-                                subtitleRight={`today ${formatTodayDuration(item.duration)}`}
+                                subtitleRight={`${item.sessionCount} ${item.sessionCount === 1 ? 'session' : 'sessions'}`}
+                                onClick={() => setSelectedDetailActivity(item)}
+                                className="cursor-pointer active:scale-[0.98] transition-transform"
                             />
                         ))}
                     </div>
                 </div>
+            )}
+
+            {/* Activity Detail Modal */}
+            <ActivityDetailModal
+                isOpen={Boolean(activeDetailActivity)}
+                onClose={() => setSelectedDetailActivity(null)}
+                activity={activeDetailActivity}
+                viewMode={viewMode}
+                selectedDate={selectedDate}
+                activityRecords={selectedActivityRecords}
+                onSelectRecord={(rec) => {
+                    const target = (rec as any).originalRecord || rec;
+                    const storeRecord = records.find((r) => r.id === target.id);
+                    setEditingRecord(storeRecord || target);
+                }}
+            />
+
+            {/* Edit Record Modal if clicked from detail */}
+            {editingRecord && (
+                <EditRecordScreen
+                    record={editingRecord}
+                    onClose={() => setEditingRecord(null)}
+                />
             )}
 
             <DateSelectorBar
