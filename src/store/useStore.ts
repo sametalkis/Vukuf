@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import type { RecordType, Record, RunningRecord } from '../types';
 import { DEFAULT_ACCENT_COLOR, applyAccentColor } from '../utils/accentColor';
+import { idbStorage } from '../utils/idbStorage';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function now() {
@@ -21,6 +22,12 @@ interface TimeTrackerStore {
     runningRecord: RunningRecord | null;
     showUntrackedTime: boolean;
     accentColor: string;
+
+    // Notification settings
+    notificationsEnabled: boolean;
+    notificationMinutes: number;
+    notificationRepeat: boolean;
+    notificationSound: boolean;
 
     // RecordType actions
     addRecordType: (data: Omit<RecordType, 'id'>) => void;
@@ -44,6 +51,10 @@ interface TimeTrackerStore {
     // Settings
     toggleUntrackedTime: () => void;
     setAccentColor: (color: string) => void;
+    toggleNotifications: () => void;
+    setNotificationMinutes: (mins: number) => void;
+    toggleNotificationRepeat: () => void;
+    toggleNotificationSound: () => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -55,6 +66,10 @@ export const useStore = create<TimeTrackerStore>()(
             runningRecord: null,
             showUntrackedTime: true,
             accentColor: DEFAULT_ACCENT_COLOR,
+            notificationsEnabled: false,
+            notificationMinutes: 30,
+            notificationRepeat: true,
+            notificationSound: true,
 
             // ── RecordType CRUD ──
             addRecordType: (data) => {
@@ -467,10 +482,26 @@ export const useStore = create<TimeTrackerStore>()(
                 applyAccentColor(color);
             },
 
+            toggleNotifications: () => {
+                set((s) => ({ notificationsEnabled: !s.notificationsEnabled }));
+            },
+
+            setNotificationMinutes: (mins: number) => {
+                set({ notificationMinutes: Math.max(1, mins) });
+            },
+
+            toggleNotificationRepeat: () => {
+                set((s) => ({ notificationRepeat: !s.notificationRepeat }));
+            },
+
+            toggleNotificationSound: () => {
+                set((s) => ({ notificationSound: !s.notificationSound }));
+            },
+
         }),
         {
             name: 'simple-time-tracker',
-            storage: createJSONStorage(() => localStorage),
+            storage: createJSONStorage(() => idbStorage),
             onRehydrateStorage: () => (state) => {
                 const color = state?.accentColor || DEFAULT_ACCENT_COLOR;
                 applyAccentColor(color);

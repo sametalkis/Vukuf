@@ -13,6 +13,7 @@ import HomeScreen from './screens/HomeScreen';
 import RecordsScreen from './screens/RecordsScreen';
 import StatisticsScreen from './screens/StatisticsScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import { useActivityReminder } from './hooks/useActivityReminder';
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -55,6 +56,9 @@ function App() {
   useEffect(() => {
     applyAccentColor(accentColor || DEFAULT_ACCENT_COLOR);
   }, [accentColor]);
+
+  // Active activity duration reminder hook
+  useActivityReminder();
 
   return (
     <ThemeProvider>

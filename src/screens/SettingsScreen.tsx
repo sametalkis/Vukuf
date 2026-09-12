@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { Moon, Sun, Download, Upload, Trash2, AlertTriangle, Check, Clock, Palette } from 'lucide-react';
+import { Moon, Sun, Download, Upload, Trash2, AlertTriangle, Check, Clock, Palette, Bell, Repeat, Volume2, VolumeX, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/useStore';
 import { ACCENT_PRESETS } from '../utils/accentColor';
+import { checkNotificationPermission, requestNotificationPermission, sendActivityNotification } from '../utils/notifications';
 
 export default function SettingsScreen() {
     const { theme, toggleTheme } = useTheme();
@@ -11,11 +12,37 @@ export default function SettingsScreen() {
         recordTypes, records, runningRecord,
         importData, importCSV, importBackup, clearAllData,
         showUntrackedTime, toggleUntrackedTime,
-        accentColor, setAccentColor
+        accentColor, setAccentColor,
+        notificationsEnabled, toggleNotifications,
+        notificationMinutes, setNotificationMinutes,
+        notificationRepeat, toggleNotificationRepeat,
+        notificationSound, toggleNotificationSound
     } = useStore();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const [permissionStatus, setPermissionStatus] = useState(checkNotificationPermission());
+
+    const handleRequestPermission = async () => {
+        const granted = await requestNotificationPermission();
+        setPermissionStatus(checkNotificationPermission());
+        if (granted && !notificationsEnabled) {
+            toggleNotifications();
+        }
+    };
+
+    const handleTestNotification = async () => {
+        if (checkNotificationPermission() !== 'granted') {
+            const granted = await requestNotificationPermission();
+            setPermissionStatus(checkNotificationPermission());
+            if (!granted) return;
+        }
+        sendActivityNotification(
+            '⏰ Test Bildirimi',
+            'Harika! Bildirimler başarıyla çalışıyor.',
+            notificationSound
+        );
+    };
 
     const [importStatus, setImportStatus] = useState<{
         type: 'idle' | 'success' | 'error';
@@ -280,6 +307,159 @@ export default function SettingsScreen() {
                                 })()}
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                {/* Notifications */}
+                <section className="space-y-2">
+                    <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-1">
+                        Notifications
+                    </h2>
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm overflow-hidden divide-y divide-gray-100 dark:divide-gray-800">
+                        {/* Permission Banner (if not granted) */}
+                        {permissionStatus !== 'granted' && (
+                            <div className="p-4 bg-amber-500/10 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <Bell size={20} className="text-amber-500 flex-shrink-0" />
+                                    <div>
+                                        <p className="text-xs font-semibold text-amber-900 dark:text-amber-300">
+                                            {permissionStatus === 'denied' ? 'Bildirim İzni Engellenmiş' : 'Bildirim İzni Gerekli'}
+                                        </p>
+                                        <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80 mt-0.5">
+                                            {permissionStatus === 'denied'
+                                                ? 'Aktivite uyarıları için tarayıcı site ayarlarından bildirimlere izin verin.'
+                                                : 'Aktivite uyarılarını alabilmek için tarayıcı bildirimi izni verin.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                {permissionStatus !== 'denied' && (
+                                    <button
+                                        onClick={handleRequestPermission}
+                                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm flex-shrink-0"
+                                        style={{ backgroundColor: 'var(--primary, #ff9100)', color: 'var(--primary-contrast, #ffffff)' }}
+                                    >
+                                        İzin Ver
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Enable/Disable Reminder */}
+                        <div className="flex items-center justify-between px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
+                            <div className="flex items-center gap-4">
+                                <div
+                                    className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                                    style={{
+                                        backgroundColor: 'var(--primary-soft, rgba(255, 145, 0, 0.15))',
+                                        color: 'var(--primary, #ff9100)'
+                                    }}
+                                >
+                                    <Bell size={20} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Aktivite Süre Uyarısı</p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Aynı aktivitede uzun süre kalınca uyar</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={toggleNotifications}
+                                className={`relative w-12 h-6 rounded-full transition-colors duration-300 flex-shrink-0 ${notificationsEnabled ? 'bg-primary-600' : 'bg-gray-300'}`}
+                                style={notificationsEnabled ? { backgroundColor: 'var(--primary, #ff9100)' } : undefined}
+                            >
+                                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${notificationsEnabled ? 'left-6' : 'left-0.5'}`} />
+                            </button>
+                        </div>
+
+                        {/* Notification Duration Picker & Settings (when enabled) */}
+                        {notificationsEnabled && (
+                            <>
+                                <div className="px-4 py-4 space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Hatırlatma Süresi</p>
+                                        <span
+                                            className="text-xs font-bold px-2 py-0.5 rounded-md"
+                                            style={{ backgroundColor: 'var(--primary-soft, rgba(255, 145, 0, 0.15))', color: 'var(--primary, #ff9100)' }}
+                                        >
+                                            {notificationMinutes < 60 ? `${notificationMinutes} dakika` : `${notificationMinutes / 60} saat`}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        {[15, 30, 45, 60, 90, 120].map((mins) => {
+                                            const isSelected = notificationMinutes === mins;
+                                            return (
+                                                <button
+                                                    key={mins}
+                                                    type="button"
+                                                    onClick={() => setNotificationMinutes(mins)}
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                                                        isSelected
+                                                            ? 'shadow-sm font-bold scale-105'
+                                                            : 'bg-gray-100 dark:bg-neutral-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-neutral-700'
+                                                    }`}
+                                                    style={isSelected ? {
+                                                        backgroundColor: 'var(--primary, #ff9100)',
+                                                        color: 'var(--primary-contrast, #ffffff)'
+                                                    } : undefined}
+                                                >
+                                                    {mins < 60 ? `${mins} dk` : `${mins / 60} sa`}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Repeat Reminder */}
+                                <div className="flex items-center justify-between px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center flex-shrink-0 text-gray-500">
+                                            <Repeat size={18} />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Periyodik Tekrarla</p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Her {notificationMinutes} dakikada bir hatırlat</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={toggleNotificationRepeat}
+                                        className={`relative w-12 h-6 rounded-full transition-colors duration-300 flex-shrink-0 ${notificationRepeat ? 'bg-primary-600' : 'bg-gray-300'}`}
+                                        style={notificationRepeat ? { backgroundColor: 'var(--primary, #ff9100)' } : undefined}
+                                    >
+                                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${notificationRepeat ? 'left-6' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Notification Sound */}
+                                <div className="flex items-center justify-between px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-2xl bg-gray-100 dark:bg-neutral-800 flex items-center justify-center flex-shrink-0 text-gray-500">
+                                            {notificationSound ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Sesli Uyarı</p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Bildirim geldiğinde nazik melodi çal</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={toggleNotificationSound}
+                                        className={`relative w-12 h-6 rounded-full transition-colors duration-300 flex-shrink-0 ${notificationSound ? 'bg-primary-600' : 'bg-gray-300'}`}
+                                        style={notificationSound ? { backgroundColor: 'var(--primary, #ff9100)' } : undefined}
+                                    >
+                                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${notificationSound ? 'left-6' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                {/* Test Notification Button */}
+                                <div className="p-4 bg-gray-50/50 dark:bg-neutral-900/50">
+                                    <button
+                                        type="button"
+                                        onClick={handleTestNotification}
+                                        className="w-full py-2.5 px-4 rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Send size={14} /> Test Bildirimi Gönder
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </section>
 
