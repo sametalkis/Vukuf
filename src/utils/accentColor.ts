@@ -34,33 +34,7 @@ export function getContrastColor(hexColor: string): '#ffffff' | '#000000' {
 }
 
 /**
- * Generates an SVG favicon and updates the browser tab favicon.
- */
-export function updateDynamicFavicon(accentHex: string) {
-    if (typeof document === 'undefined') return;
-
-    const contrast = getContrastColor(accentHex);
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="44" fill="${accentHex}"/>
-  <g transform="translate(36, 36) scale(5)" stroke="${contrast}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <circle cx="12" cy="12" r="10"/>
-    <polyline points="12 6 12 12 16 14"/>
-  </g>
-</svg>`;
-
-    const svgUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-    let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
-    if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
-    }
-    link.type = 'image/svg+xml';
-    link.href = svgUrl;
-}
-
-/**
- * Applies the accent color to CSS root variables and updates dynamic favicon.
+ * Applies the accent color to CSS root variables.
  */
 export function applyAccentColor(accentHex: string = DEFAULT_ACCENT_COLOR) {
     if (typeof document === 'undefined') return;
@@ -74,6 +48,4 @@ export function applyAccentColor(accentHex: string = DEFAULT_ACCENT_COLOR) {
     root.style.setProperty('--primary-soft', `${accentHex}25`);
     root.style.setProperty('--primary-border', `${accentHex}40`);
     root.style.setProperty('--glow-primary', `0 0 20px ${accentHex}40`);
-
-    updateDynamicFavicon(accentHex);
 }
