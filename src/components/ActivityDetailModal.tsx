@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -200,6 +200,8 @@ export default function ActivityDetailModal({
     }, [activity, allStoreRecords, recordTypes]);
 
     // ── Day of Week Distribution (Pzt - Paz) ──
+    const [weekdayMetric, setWeekdayMetric] = useState<'total' | 'average'>('total');
+
     const weekdayDistribution = useMemo(() => {
         if (!activity || activityRecords.length === 0) return [];
 
@@ -218,16 +220,67 @@ export default function ActivityDetailModal({
             days[idx].duration += r.duration;
         }
 
-        const maxDuration = Math.max(1, ...days.map((d) => d.duration));
+        // Calculate approximate weeks in current period to get meaningful daily averages
+        let weeksInPeriod = 1;
+        if (viewMode === 'month') {
+            const year = selectedDate.getFullYear();
+            const month = selectedDate.getMonth();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            weeksInPeriod = Math.max(1, daysInMonth / 7);
+        } else if (viewMode === 'year') {
+            const currentYear = new Date().getFullYear();
+            if (selectedDate.getFullYear() === currentYear) {
+                const startOfYear = new Date(currentYear, 0, 1).getTime();
+                const daysPassed = Math.max(1, Math.min(365, Math.ceil((Date.now() - startOfYear) / (24 * 3600 * 1000))));
+                weeksInPeriod = Math.max(1, daysPassed / 7);
+            } else {
+                weeksInPeriod = 52;
+            }
+        } else if (viewMode === 'all') {
+            if (activityRecords.length > 0) {
+                const times = activityRecords.map(r => new Date(r.startTime).getTime());
+                const minT = Math.min(...times);
+                const maxT = Math.max(...times);
+                const diffDays = Math.max(1, (maxT - minT) / (24 * 3600 * 1000));
+                weeksInPeriod = Math.max(1, diffDays / 7);
+            }
+        }
+
+        const durations = days.map((d) => d.duration);
+        const maxDuration = Math.max(1, ...durations);
+        const nonZeroDurations = durations.filter((d) => d > 0);
+        const minNonZero = nonZeroDurations.length > 0 ? Math.min(...nonZeroDurations) : 0;
         const totalDuration = days.reduce((sum, d) => sum + d.duration, 0);
 
-        return days.map((d) => ({
-            ...d,
-            percentOfMax: Math.round((d.duration / maxDuration) * 100),
-            percentOfTotal: totalDuration > 0 ? Math.round((d.duration / totalDuration) * 100) : 0,
-            formatted: formatDuration(d.duration),
-        }));
-    }, [activity, activityRecords]);
+        // If all 7 days have values and are tightly clustered (like in yearly aggregation where min is > 40% of max)
+        const isClustered = nonZeroDurations.length === 7 && (minNonZero / maxDuration) > 0.4;
+
+        return days.map((d) => {
+            let heightPercent = 0;
+            if (d.duration > 0) {
+                if (isClustered && maxDuration > minNonZero) {
+                    // Spread the clustered variance nicely: min day is 32%, max day is 85%
+                    const ratio = (d.duration - minNonZero) / (maxDuration - minNonZero);
+                    heightPercent = Math.round(32 + ratio * (85 - 32));
+                } else {
+                    // Proportional scaling from 0 to 85% max headroom
+                    heightPercent = Math.max(8, Math.round((d.duration / maxDuration) * 85));
+                }
+            }
+
+            const avgDur = Math.round(d.duration / Math.max(1, weeksInPeriod));
+
+            return {
+                ...d,
+                heightPercent,
+                percentOfTotal: totalDuration > 0 ? Math.round((d.duration / totalDuration) * 100) : 0,
+                formatted: formatDuration(d.duration),
+                avgDuration: avgDur,
+                avgFormatted: formatDuration(avgDur),
+                isPeak: d.duration === maxDuration && d.duration > 0,
+            };
+        });
+    }, [activity, activityRecords, viewMode, selectedDate]);
 
     const bestWeekday = useMemo(() => {
         if (!weekdayDistribution.length) return null;
@@ -725,13 +778,43 @@ export default function ActivityDetailModal({
                         {/* ── Day of the Week Distribution (Pzt - Paz) ── */}
                         {viewMode !== 'day' && weekdayDistribution.length > 0 && (
                             <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                        Day of the Week Distribution
-                                    </span>
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                            Day of the Week Distribution
+                                        </span>
+                                        {/* Toggle Total vs Average */}
+                                        <div className="flex items-center bg-gray-200/80 dark:bg-neutral-800 p-0.5 rounded-lg text-[10px] font-semibold">
+                                            <button
+                                                type="button"
+                                                onClick={() => setWeekdayMetric('total')}
+                                                className={`px-2 py-0.5 rounded-md transition-all ${
+                                                    weekdayMetric === 'total'
+                                                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-xs font-bold'
+                                                        : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+                                                }`}
+                                            >
+                                                Total
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setWeekdayMetric('average')}
+                                                className={`px-2 py-0.5 rounded-md transition-all ${
+                                                    weekdayMetric === 'average'
+                                                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-xs font-bold'
+                                                        : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+                                                }`}
+                                            >
+                                                Avg/Day
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     {bestWeekday && (
-                                        <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md">
-                                            🏆 Peak Day: {bestWeekday.label} ({bestWeekday.formatted})
+                                        <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                            🏆 Peak Day: {bestWeekday.label} (
+                                            {weekdayMetric === 'total' ? bestWeekday.formatted : `~${bestWeekday.avgFormatted}/d`}
+                                            )
                                         </span>
                                     )}
                                 </div>
@@ -739,22 +822,44 @@ export default function ActivityDetailModal({
                                 <div className="grid grid-cols-7 gap-1.5 pt-2">
                                     {weekdayDistribution.map((d) => (
                                         <div key={d.dayIndex} className="flex flex-col items-center">
-                                            <div className="w-full h-24 bg-gray-200 dark:bg-gray-700 rounded-xl flex items-end p-1 overflow-hidden">
+                                            {/* Bar Track with Headroom and Peak Highlighting */}
+                                            <div className={`w-full h-24 bg-gray-200/80 dark:bg-gray-800 rounded-xl flex items-end p-1.5 overflow-hidden transition-all ${
+                                                d.isPeak ? 'ring-1.5 ring-emerald-500/50 dark:ring-emerald-400/50 bg-emerald-500/5' : ''
+                                            }`}>
                                                 <div
                                                     style={{
-                                                        height: `${Math.max(8, d.percentOfMax)}%`,
+                                                        height: `${d.heightPercent}%`,
                                                         backgroundColor: activity.color,
                                                     }}
-                                                    className="w-full rounded-lg transition-all duration-500 opacity-90 hover:opacity-100"
-                                                    title={`${d.label}: ${d.formatted} (%${d.percentOfTotal})`}
+                                                    className={`w-full rounded-lg transition-all duration-500 ${
+                                                        d.isPeak
+                                                            ? 'opacity-100 shadow-sm'
+                                                            : 'opacity-80 hover:opacity-100'
+                                                    }`}
+                                                    title={`${d.label}: Toplam ${d.formatted} (${d.avgFormatted}/gün) - %${d.percentOfTotal}`}
                                                 />
                                             </div>
-                                            <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 mt-1.5">
+
+                                            {/* Day Label */}
+                                            <span className={`text-[11px] font-bold mt-1.5 ${
+                                                d.isPeak ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'
+                                            }`}>
                                                 {d.label}
                                             </span>
-                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
-                                                {d.duration > 0 ? formatDuration(d.duration) : '-'}
+
+                                            {/* Primary Metric Value */}
+                                            <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300 tabular-nums">
+                                                {d.duration > 0
+                                                    ? (weekdayMetric === 'total' ? d.formatted : `~${d.avgFormatted}`)
+                                                    : '-'}
                                             </span>
+
+                                            {/* Secondary Metric Subtitle in Total mode for year/all */}
+                                            {d.duration > 0 && weekdayMetric === 'total' && (viewMode === 'year' || viewMode === 'all') && (
+                                                <span className="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">
+                                                    ~{d.avgFormatted}/d
+                                                </span>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
