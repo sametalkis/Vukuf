@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import {
     X,
     Clock,
@@ -48,16 +49,6 @@ interface ActivityDetailModalProps {
     onSelectRecord?: (record: TimeRecord) => void;
 }
 
-function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-}
-
-function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
 export default function ActivityDetailModal({
     isOpen,
     onClose,
@@ -67,7 +58,22 @@ export default function ActivityDetailModal({
     activityRecords,
     onSelectRecord,
 }: ActivityDetailModalProps) {
+    const { t, i18n } = useTranslation();
+    const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-US';
+    const isTr = i18n.language?.startsWith('tr');
     const { recordTypes, records: allStoreRecords, runningRecord } = useStore();
+
+    function formatTime(iso: string): string {
+        return new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+
+    function formatDate(iso: string): string {
+        return new Date(iso).toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+
+    const WEEKDAY_NAMES = isTr
+        ? ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz']
+        : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     // All store records for this activity across time (for full streak and heatmap tracking)
     const activityAllRecords = useMemo(() => {
@@ -119,17 +125,17 @@ export default function ActivityDetailModal({
     const periodTitle = useMemo(() => {
         if (viewMode === 'day') {
             const today = new Date();
-            if (selectedDate.toDateString() === today.toDateString()) return 'Today';
-            return selectedDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            if (selectedDate.toDateString() === today.toDateString()) return t('common.today');
+            return selectedDate.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
         }
         if (viewMode === 'month') {
-            return selectedDate.toLocaleDateString([], { month: 'long', year: 'numeric' });
+            return selectedDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
         }
         if (viewMode === 'year') {
             return `${selectedDate.getFullYear()}`;
         }
-        return 'All Time';
-    }, [viewMode, selectedDate]);
+        return t('common.allTime');
+    }, [viewMode, selectedDate, locale, t]);
 
     // ── Habit Sequence & Transition Insights ──
     // "En çok hangi aktiviteden sonra geliyor?" & "En çok hangisine geçiliyor?"
@@ -415,10 +421,10 @@ export default function ActivityDetailModal({
         }
 
         const peakSlotLabels: Record<string, string> = {
-            morning: 'Morning (06:00 - 12:00)',
-            afternoon: 'Afternoon (12:00 - 18:00)',
-            evening: 'Evening (18:00 - 24:00)',
-            night: 'Night (00:00 - 06:00)',
+            morning: t('activityDetail.morningSlot'),
+            afternoon: t('activityDetail.afternoonSlot'),
+            evening: t('activityDetail.eveningSlot'),
+            night: t('activityDetail.nightSlot'),
         };
 
         // Trend Chart Data
@@ -504,7 +510,7 @@ export default function ActivityDetailModal({
             for (const r of activityRecords) {
                 const d = new Date(r.startTime);
                 const key = `${d.getFullYear()}-${d.getMonth()}`;
-                const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                const label = d.toLocaleDateString(locale, { month: 'short', year: '2-digit' });
                 if (!byMonthYear[key]) {
                     byMonthYear[key] = { label, duration: 0 };
                 }
@@ -528,7 +534,7 @@ export default function ActivityDetailModal({
             timeOfDayStats: tod,
             peakTimeSlot: peakSlotLabels[peakSlot] || '',
         };
-    }, [activity, activityRecords, uniqueRecords, viewMode, selectedDate]);
+    }, [activity, activityRecords, uniqueRecords, viewMode, selectedDate, t]);
 
     if (!isOpen || !activity) return null;
 
@@ -581,7 +587,7 @@ export default function ActivityDetailModal({
                                         {periodTitle}
                                     </span>
                                     <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                                        {formatPercent(activity.percent)} of total
+                                        {t('activityDetail.percentOfTotal', { percent: parseFloat(activity.percent.toFixed(1)) })}
                                     </span>
                                 </div>
                             </div>
@@ -590,7 +596,7 @@ export default function ActivityDetailModal({
                         <button
                             onClick={onClose}
                             className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 flex items-center justify-center transition-colors flex-shrink-0"
-                            aria-label="Close"
+                            aria-label={t('common.close')}
                         >
                             <X size={18} />
                         </button>
@@ -604,7 +610,7 @@ export default function ActivityDetailModal({
                             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 mb-1">
                                     <Clock size={14} />
-                                    <span className="text-xs font-medium">Total Time</span>
+                                    <span className="text-xs font-medium">{t('activityDetail.totalTime')}</span>
                                 </div>
                                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                                     {formatDuration(totalDurationSec)}
@@ -615,7 +621,7 @@ export default function ActivityDetailModal({
                             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 mb-1">
                                     <Calendar size={14} />
-                                    <span className="text-xs font-medium">Sessions</span>
+                                    <span className="text-xs font-medium">{t('activityDetail.sessions')}</span>
                                 </div>
                                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                                     {uniqueRecords.length}
@@ -626,7 +632,7 @@ export default function ActivityDetailModal({
                             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 mb-1">
                                     <TrendingUp size={14} />
-                                    <span className="text-xs font-medium">Avg Session</span>
+                                    <span className="text-xs font-medium">{t('activityDetail.avgSession')}</span>
                                 </div>
                                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                                     {formatDuration(avgSessionDuration)}
@@ -637,10 +643,10 @@ export default function ActivityDetailModal({
                             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 mb-1">
                                     <Repeat size={14} />
-                                    <span className="text-xs font-medium">Active Days</span>
+                                    <span className="text-xs font-medium">{t('activityDetail.activeDays')}</span>
                                 </div>
                                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                                    {consistencyStats.activeDaysCount} days
+                                    {t('activityDetail.activeDaysCount', { count: consistencyStats.activeDaysCount })}
                                 </p>
                             </div>
 
@@ -648,10 +654,10 @@ export default function ActivityDetailModal({
                             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center gap-1.5 text-amber-500 mb-1">
                                     <Flame size={14} />
-                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Best Streak</span>
+                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">{t('activityDetail.bestStreak')}</span>
                                 </div>
                                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                                    {consistencyStats.bestStreak} {consistencyStats.bestStreak === 1 ? 'day' : 'days'}
+                                    {t('activityDetail.streakDays', { count: consistencyStats.bestStreak })}
                                 </p>
                             </div>
 
@@ -659,7 +665,7 @@ export default function ActivityDetailModal({
                             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center gap-1.5 text-emerald-500 mb-1">
                                     <Award size={14} />
-                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Longest</span>
+                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">{t('activityDetail.longest')}</span>
                                 </div>
                                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums truncate">
                                     {longestSession ? formatDuration(longestSession.duration) : '-'}
@@ -667,17 +673,17 @@ export default function ActivityDetailModal({
                             </div>
                         </div>
 
-                        {/* ── Habit Sequence & Transition Analysis ("En Çok Hangi Aktiviteden Sonra Geliyor?") ── */}
+                        {/* ── Habit Sequence & Transition Analysis ── */}
                         <div className="p-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100/70 dark:from-gray-800/60 dark:to-gray-800/30 border border-gray-100 dark:border-gray-800 space-y-3.5">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Sparkles size={16} className="text-amber-500" />
                                     <span className="text-xs font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">
-                                        Habit Sequence & Flow
+                                        {t('activityDetail.habitSequence')}
                                     </span>
                                 </div>
                                 <span className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">
-                                    Transition Insights
+                                    {t('activityDetail.transitionInsights')}
                                 </span>
                             </div>
 
@@ -686,7 +692,7 @@ export default function ActivityDetailModal({
                                 {/* Preceding Activity */}
                                 <div className="flex-1 flex flex-col items-center text-center p-1">
                                     <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1">
-                                        Preceded By
+                                        {t('activityDetail.precededBy')}
                                     </span>
                                     {habitTransitions.topPreceding ? (
                                         <>
@@ -713,7 +719,7 @@ export default function ActivityDetailModal({
                                 {/* Current Activity */}
                                 <div className="flex-1 flex flex-col items-center text-center p-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                                     <span className="text-[10px] font-semibold text-primary-500 dark:text-primary-400 uppercase mb-1">
-                                        This Activity
+                                        {t('activityDetail.thisActivity')}
                                     </span>
                                     <div
                                         className="w-8 h-8 rounded-lg flex items-center justify-center mb-1 shadow-sm"
@@ -724,7 +730,7 @@ export default function ActivityDetailModal({
                                     <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate max-w-[90px]">
                                         {activity.name}
                                     </p>
-                                    <span className="text-[10px] text-gray-400">Current</span>
+                                    <span className="text-[10px] text-gray-400">{t('activityDetail.current')}</span>
                                 </div>
 
                                 <ArrowRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
@@ -732,7 +738,7 @@ export default function ActivityDetailModal({
                                 {/* Following Activity */}
                                 <div className="flex-1 flex flex-col items-center text-center p-1">
                                     <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1">
-                                        Followed By
+                                        {t('activityDetail.followedBy')}
                                     </span>
                                     {habitTransitions.topSucceeding ? (
                                         <>
@@ -759,7 +765,7 @@ export default function ActivityDetailModal({
                             {habitTransitions.preceding.length > 1 && (
                                 <div className="pt-1">
                                     <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1.5">
-                                        Other activities usually preceding {activity.name}:
+                                        {t('activityDetail.otherPreceding', { name: activity.name })}
                                     </p>
                                     <div className="flex flex-wrap gap-1.5">
                                         {habitTransitions.preceding.slice(1).map((p) => (
@@ -791,7 +797,7 @@ export default function ActivityDetailModal({
                                 recordTypes={recordTypes}
                                 runningRecord={runningRecord?.recordTypeId === activity.id ? runningRecord : null}
                                 customColor={activity.color}
-                                title={`${activity.name} • ${viewMode === 'year' ? 'Yıllık Dağılım' : 'Aylık Dağılım'}`}
+                                title={`${activity.name} • ${viewMode === 'year' ? t('activityDetail.yearlyDist') : t('activityDetail.monthlyDist')}`}
                                 className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3.5"
                             />
                         )}
@@ -802,7 +808,7 @@ export default function ActivityDetailModal({
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                            Day of the Week Distribution
+                                            {t('activityDetail.weekdayDist')}
                                         </span>
                                         {/* Toggle Total vs Average */}
                                         <div className="flex items-center bg-gray-200/80 dark:bg-neutral-800 p-0.5 rounded-lg text-[10px] font-semibold">
@@ -815,7 +821,7 @@ export default function ActivityDetailModal({
                                                         : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
                                                 }`}
                                             >
-                                                Total
+                                                {t('activityDetail.totalMetric')}
                                             </button>
                                             <button
                                                 type="button"
@@ -826,16 +832,17 @@ export default function ActivityDetailModal({
                                                         : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
                                                 }`}
                                             >
-                                                Avg/Day
+                                                {t('activityDetail.avgDayMetric')}
                                             </button>
                                         </div>
                                     </div>
 
                                     {bestWeekday && (
                                         <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                            🏆 Peak Day: {bestWeekday.label} (
-                                            {weekdayMetric === 'total' ? bestWeekday.formatted : `~${bestWeekday.avgFormatted}/d`}
-                                            )
+                                            {t('activityDetail.peakDayBadge', {
+                                                day: bestWeekday.label,
+                                                val: weekdayMetric === 'total' ? bestWeekday.formatted : `~${bestWeekday.avgFormatted}/${isTr ? 'g' : 'd'}`
+                                            })}
                                         </span>
                                     )}
                                 </div>
@@ -857,7 +864,7 @@ export default function ActivityDetailModal({
                                                             ? 'opacity-100 shadow-sm'
                                                             : 'opacity-80 hover:opacity-100'
                                                     }`}
-                                                    title={`${d.label}: Toplam ${d.formatted} (${d.avgFormatted}/gün) - ${formatPercent(d.percentOfTotal)}`}
+                                                    title={`${d.label}: ${t('activityDetail.totalMetric')} ${d.formatted} (${d.avgFormatted}/${isTr ? 'gün' : 'd'}) - ${formatPercent(d.percentOfTotal)}`}
                                                 />
                                             </div>
 
@@ -878,7 +885,7 @@ export default function ActivityDetailModal({
                                             {/* Secondary Metric Subtitle in Total mode for year/all */}
                                             {d.duration > 0 && weekdayMetric === 'total' && (viewMode === 'year' || viewMode === 'all') && (
                                                 <span className="text-[9px] text-gray-400 dark:text-gray-500 tabular-nums">
-                                                    ~{d.avgFormatted}/d
+                                                    ~{d.avgFormatted}/{isTr ? 'g' : 'd'}
                                                 </span>
                                             )}
                                         </div>
@@ -892,10 +899,10 @@ export default function ActivityDetailModal({
                             <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                        Timeline Breakdown
+                                        {t('activityDetail.timelineBreakdown')}
                                     </span>
                                     <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                        {viewMode === 'day' ? 'Minutes per Hour' : 'Hours'}
+                                        {viewMode === 'day' ? t('activityDetail.minPerHour') : t('activityDetail.hours')}
                                     </span>
                                 </div>
                                 <div className="h-44 w-full min-w-0" style={{ minHeight: '176px' }}>
@@ -939,12 +946,12 @@ export default function ActivityDetailModal({
                         <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                    Time of Day Pattern
+                                    {t('activityDetail.timeOfDayPattern')}
                                 </span>
                                 {peakTimeSlot && (
                                     <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md">
                                         <Flame size={12} />
-                                        Peak: {peakTimeSlot}
+                                        {t('activityDetail.peakBadge', { slot: peakTimeSlot })}
                                     </span>
                                 )}
                             </div>
@@ -954,22 +961,22 @@ export default function ActivityDetailModal({
                                 <div
                                     style={{ width: `${(timeOfDayStats.morning / totalTodDuration) * 100}%` }}
                                     className="bg-sky-400 transition-all duration-500"
-                                    title={`Morning: ${formatDuration(timeOfDayStats.morning)}`}
+                                    title={`${t('activityDetail.morning')}: ${formatDuration(timeOfDayStats.morning)}`}
                                 />
                                 <div
                                     style={{ width: `${(timeOfDayStats.afternoon / totalTodDuration) * 100}%` }}
                                     className="bg-amber-400 transition-all duration-500"
-                                    title={`Afternoon: ${formatDuration(timeOfDayStats.afternoon)}`}
+                                    title={`${t('activityDetail.afternoon')}: ${formatDuration(timeOfDayStats.afternoon)}`}
                                 />
                                 <div
                                     style={{ width: `${(timeOfDayStats.evening / totalTodDuration) * 100}%` }}
                                     className="bg-indigo-500 transition-all duration-500"
-                                    title={`Evening: ${formatDuration(timeOfDayStats.evening)}`}
+                                    title={`${t('activityDetail.evening')}: ${formatDuration(timeOfDayStats.evening)}`}
                                 />
                                 <div
                                     style={{ width: `${(timeOfDayStats.night / totalTodDuration) * 100}%` }}
                                     className="bg-purple-600 transition-all duration-500"
-                                    title={`Night: ${formatDuration(timeOfDayStats.night)}`}
+                                    title={`${t('activityDetail.night')}: ${formatDuration(timeOfDayStats.night)}`}
                                 />
                             </div>
 
@@ -978,25 +985,25 @@ export default function ActivityDetailModal({
                                 <div className="flex items-center gap-1.5">
                                     <span className="w-2.5 h-2.5 rounded-full bg-sky-400 flex-shrink-0" />
                                     <span className="text-gray-500 dark:text-gray-400 truncate">
-                                        Morning ({Math.round((timeOfDayStats.morning / totalTodDuration) * 100)}%)
+                                        {t('activityDetail.morning')} ({Math.round((timeOfDayStats.morning / totalTodDuration) * 100)}%)
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
                                     <span className="text-gray-500 dark:text-gray-400 truncate">
-                                        Afternoon ({Math.round((timeOfDayStats.afternoon / totalTodDuration) * 100)}%)
+                                        {t('activityDetail.afternoon')} ({Math.round((timeOfDayStats.afternoon / totalTodDuration) * 100)}%)
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 flex-shrink-0" />
                                     <span className="text-gray-500 dark:text-gray-400 truncate">
-                                        Evening ({Math.round((timeOfDayStats.evening / totalTodDuration) * 100)}%)
+                                        {t('activityDetail.evening')} ({Math.round((timeOfDayStats.evening / totalTodDuration) * 100)}%)
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                     <span className="w-2.5 h-2.5 rounded-full bg-purple-600 flex-shrink-0" />
                                     <span className="text-gray-500 dark:text-gray-400 truncate">
-                                        Night ({Math.round((timeOfDayStats.night / totalTodDuration) * 100)}%)
+                                        {t('activityDetail.night')} ({Math.round((timeOfDayStats.night / totalTodDuration) * 100)}%)
                                     </span>
                                 </div>
                             </div>
@@ -1006,11 +1013,11 @@ export default function ActivityDetailModal({
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                    Sessions in this period ({uniqueRecords.length})
+                                    {t('activityDetail.sessionsCountPeriod', { count: uniqueRecords.length })}
                                 </span>
                                 {onSelectRecord && uniqueRecords.length > 0 && (
                                     <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                        Tap to edit
+                                        {t('activityDetail.tapToEdit')}
                                     </span>
                                 )}
                             </div>
@@ -1048,7 +1055,7 @@ export default function ActivityDetailModal({
 
                                 {uniqueRecords.length === 0 && (
                                     <div className="py-6 text-center text-xs text-gray-400 dark:text-gray-500">
-                                        No individual sessions found for this period.
+                                        {t('activityDetail.noSessionsFound')}
                                     </div>
                                 )}
                             </div>

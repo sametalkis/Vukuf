@@ -1,29 +1,27 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { formatTime } from '../utils/time';
+import { formatDuration, formatTime } from '../utils/time';
 import DynamicIcon from './DynamicIcon';
 import TrackingCard from './TrackingCard';
 
-function formatElapsed(seconds: number): string {
+function formatElapsed(seconds: number, isTr: boolean): string {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
+    const hS = isTr ? 'sa' : 'h';
+    const mS = isTr ? 'dk' : 'm';
+    const sS = isTr ? 'sn' : 's';
     if (h > 0) {
-        return `${h}h ${m}m ${s}s`;
+        return `${h}${hS} ${m}${mS} ${s}${sS}`;
     }
-    return `${m}m ${s}s`;
-}
-
-function formatTodayDuration(seconds: number): string {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    return `${m}m`;
+    return `${m}${mS} ${s}${sS}`;
 }
 
 export default function RunningTimerCard() {
+    const { t, i18n } = useTranslation();
+    const isTr = i18n.language?.startsWith('tr');
     const { runningRecord, stopTimer, recordTypes, records } = useStore();
     const [elapsed, setElapsed] = useState(0);
 
@@ -75,13 +73,14 @@ export default function RunningTimerCard() {
     let activity = recordTypes.find((r) => r.id === runningRecord.recordTypeId);
     if (!activity) {
         if (runningRecord.recordTypeId === 'untracked') {
-            activity = { id: 'untracked', name: 'Untracked Time', color: '#6b7280', icon: 'Clock' };
+            activity = { id: 'untracked', name: t('timer.untrackedTitle'), color: '#6b7280', icon: 'Clock' };
         } else {
             return null;
         }
     }
 
     const isUntracked = activity.id === 'untracked';
+    const activityName = isUntracked ? t('timer.untrackedTitle') : activity.name;
     const startTimeStr = formatTime(runningRecord.startTime);
 
     if (isUntracked) {
@@ -107,16 +106,16 @@ export default function RunningTimerCard() {
 
                     <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium opacity-75 text-gray-500">
-                            Automatic Background Tracker
+                            {t('timer.autoTracker')}
                         </p>
                         <p className="text-base font-bold truncate text-gray-600 dark:text-gray-400 italic">
-                            Untracked Time
+                            {activityName}
                         </p>
                     </div>
 
                     <div className="text-right flex-shrink-0">
                         <p className="text-2xl font-mono font-bold tabular-nums text-gray-600 dark:text-gray-400">
-                            {formatElapsed(elapsed)}
+                            {formatElapsed(elapsed, isTr)}
                         </p>
                     </div>
                 </div>
@@ -124,7 +123,7 @@ export default function RunningTimerCard() {
                 <div className="flex items-center gap-1.5 mt-2 ml-0.5 relative z-10">
                     <span className="w-2 h-2 rounded-full animate-pulse bg-gray-400" />
                     <span className="text-xs font-medium opacity-60 text-gray-500">
-                        Waiting for activity...
+                        {t('timer.waiting')}
                     </span>
                 </div>
             </motion.div>
@@ -140,12 +139,12 @@ export default function RunningTimerCard() {
             className="mx-4 mt-4"
         >
             <TrackingCard
-                name={activity.name}
+                name={activityName}
                 icon={activity.icon}
                 color={activity.color}
                 subtitleLeft={startTimeStr}
-                titleRight={formatElapsed(elapsed)}
-                subtitleRight={`today ${formatTodayDuration(todayTotal)}`}
+                titleRight={formatElapsed(elapsed, isTr)}
+                subtitleRight={t('timer.todayDuration', { duration: formatDuration(todayTotal) })}
                 onClick={stopTimer}
             />
         </motion.div>

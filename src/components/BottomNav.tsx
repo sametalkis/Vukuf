@@ -1,14 +1,16 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { Timer, List, BarChart2, Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const NAV_ITEMS = [
-    { path: '/', icon: Timer, label: 'Timer' },
-    { path: '/records', icon: List, label: 'Records' },
-    { path: '/statistics', icon: BarChart2, label: 'Statistics' },
-    { path: '/settings', icon: Settings, label: 'Settings' },
+    { path: '/', icon: Timer, key: 'nav.timer' },
+    { path: '/records', icon: List, key: 'nav.records' },
+    { path: '/statistics', icon: BarChart2, key: 'nav.statistics' },
+    { path: '/settings', icon: Settings, key: 'nav.settings' },
 ];
 
 export default function BottomNav() {
+    const { t } = useTranslation();
     const location = useLocation();
 
     const activeIndex = Math.max(
@@ -34,12 +36,13 @@ export default function BottomNav() {
                 )}
                 {NAV_ITEMS.map((item) => {
                     const Icon = item.icon;
+                    const label = t(item.key);
                     return (
                         <NavLink
                             key={item.path}
                             to={item.path}
-                            aria-label={item.label}
-                            title={item.label}
+                            aria-label={label}
+                            title={label}
                             className={({ isActive }) =>
                                 `bottom-nav__item${isActive ? ' bottom-nav__item--active' : ''}`
                             }

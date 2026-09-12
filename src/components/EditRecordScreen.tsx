@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Trash2, Check, Clock, ChevronDown, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { getContrastColor } from '../utils/colors';
+import { formatDuration } from '../utils/time';
 import DynamicIcon from './DynamicIcon';
 import type { Record } from '../types';
 
@@ -13,31 +15,19 @@ interface EditRecordScreenProps {
 }
 
 // ── Helpers ──
-function formatDuration(startISO: string, endISO: string): string {
-    const s = new Date(startISO).getTime();
-    const e = new Date(endISO).getTime();
-    let seconds = Math.floor((e - s) / 1000);
-    if (seconds < 0) seconds = 0;
-
-    if (seconds < 60) return `${seconds}s`;
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m`;
-}
-
-function formatDate(iso: string) {
+function formatDate(iso: string, lang: string) {
     const d = new Date(iso);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const locale = lang?.startsWith('tr') ? 'tr-TR' : 'en-US';
+    return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 function formatTime(iso: string) {
     const d = new Date(iso);
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 export default function EditRecordScreen({ record, onClose }: EditRecordScreenProps) {
+    const { t, i18n } = useTranslation();
     const { recordTypes, updateRecord, deleteRecord } = useStore();
     const [activityId, setActivityId] = useState(record.recordTypeId);
     const [isActivityOpen, setIsActivityOpen] = useState(false);
@@ -45,7 +35,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
     const [end, setEnd] = useState(new Date(record.endTime));
 
     const activity = recordTypes.find((a) => a.id === activityId) ||
-        (activityId === 'untracked' ? { id: 'untracked', name: 'Untracked Time', color: '#6b7280', icon: 'Clock' } : recordTypes[0]);
+        (activityId === 'untracked' ? { id: 'untracked', name: t('home.untracked'), color: '#6b7280', icon: 'Clock' } : recordTypes[0]);
     const contrast = activity ? getContrastColor(activity.color) : '#fff';
 
     // ── Button Handlers ──
@@ -82,7 +72,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
             onClose();
             return;
         }
-        if (window.confirm('Bu kaydı silmek istediğinden emin misin?')) {
+        if (window.confirm(t('editRecord.deleteConfirm'))) {
             deleteRecord(record.id);
             onClose();
         }
@@ -134,18 +124,18 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                         <div>
                             <h2 className="text-base font-bold leading-tight">{activity.name}</h2>
                             <div className="text-xs font-medium opacity-90 tracking-wide mt-0.5" style={{ color: contrast }}>
-                                {formatTime(start.toISOString())} – {record.isRunning ? 'Running' : formatTime(end.toISOString())}
+                                {formatTime(start.toISOString())} – {record.isRunning ? t('editRecord.running') : formatTime(end.toISOString())}
                             </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="text-base font-bold tracking-tight">
-                            {record.isRunning ? 'Active' : formatDuration(start.toISOString(), end.toISOString())}
+                            {record.isRunning ? t('editRecord.active') : formatDuration(Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000)), i18n.language)}
                         </div>
                         <button
                             onClick={onClose}
                             className="hidden sm:flex p-1 rounded-full hover:bg-black/15 active:bg-black/25 transition-colors ml-1"
-                            title="Close"
+                            title={t('common.close')}
                         >
                             <X size={20} color={contrast} />
                         </button>
@@ -159,16 +149,16 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                         onClick={handleDelete}
                         className="w-full flex items-center justify-center gap-2 bg-[#171717] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
                     >
-                        <Trash2 size={16} /> Delete Record
+                        <Trash2 size={16} /> {t('editRecord.deleteRecord')}
                     </button>
                 )}
 
                 {/* ── Start Time Box ── */}
                 <div className="relative border border-[#2a2a2a] rounded-xl pt-4 pb-3 px-3 mt-4 text-center">
-                    <span className="absolute -top-2.5 left-4 bg-[#0a0a0a] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Start</span>
+                    <span className="absolute -top-2.5 left-4 bg-[#0a0a0a] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">{t('editRecord.startLabel')}</span>
 
                     <div className="flex items-center justify-center gap-2 mb-3">
-                        <span className="text-rose-500 font-bold text-sm tracking-wide">{formatDate(start.toISOString())}</span>
+                        <span className="text-rose-500 font-bold text-sm tracking-wide">{formatDate(start.toISOString(), i18n.language)}</span>
                         <span className="text-white font-black text-3xl tracking-tight leading-none">{formatTime(start.toISOString())}</span>
                     </div>
 
@@ -186,18 +176,18 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                             onClick={() => setNow('start')}
                             className="flex-1 min-w-[48px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-300 active:bg-[#333]"
                         >
-                            Now
+                            {t('editRecord.now')}
                         </button>
                     </div>
                 </div>
 
                 {/* ── End Time Box ── */}
                 <div className={`relative border border-[#2a2a2a] rounded-xl pt-5 pb-3 px-3 text-center mt-2 ${record.isRunning ? 'opacity-30 pointer-events-none' : ''}`}>
-                    <span className="absolute -top-2.5 left-4 bg-[#0a0a0a] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">End</span>
+                    <span className="absolute -top-2.5 left-4 bg-[#0a0a0a] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">{t('editRecord.endLabel')}</span>
 
                     <div className="flex items-center justify-center gap-2 mb-3">
-                        <span className="text-rose-500 font-bold text-sm tracking-wide">{record.isRunning ? 'Now' : formatDate(end.toISOString())}</span>
-                        <span className="text-white font-black text-3xl tracking-tight leading-none">{record.isRunning ? 'Running' : formatTime(end.toISOString())}</span>
+                        <span className="text-rose-500 font-bold text-sm tracking-wide">{record.isRunning ? t('editRecord.now') : formatDate(end.toISOString(), i18n.language)}</span>
+                        <span className="text-white font-black text-3xl tracking-tight leading-none">{record.isRunning ? t('editRecord.running') : formatTime(end.toISOString())}</span>
                     </div>
 
                     <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
@@ -214,7 +204,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                             onClick={() => setNow('end')}
                             className="flex-1 min-w-[48px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-300 active:bg-[#333]"
                         >
-                            Now
+                            {t('editRecord.now')}
                         </button>
                     </div>
                 </div>
@@ -227,7 +217,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                             onClick={() => setIsActivityOpen(!isActivityOpen)}
                             className="w-full p-3 flex items-center justify-between active:bg-[#171717] transition-colors"
                         >
-                            <span className="text-gray-400 text-sm font-medium">Activity</span>
+                            <span className="text-gray-400 text-sm font-medium">{t('editRecord.activityLabel')}</span>
                             <div className="flex items-center gap-2">
                                 <div
                                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm"
@@ -308,7 +298,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                                             <div className="flex-1 flex flex-col items-center justify-center gap-1.5 w-full">
                                                 <Clock size={22} className="text-neutral-400" />
                                                 <span className="text-[11px] font-semibold text-center leading-tight px-1 w-full truncate text-neutral-400">
-                                                    Untracked
+                                                    {t('home.untracked')}
                                                 </span>
                                             </div>
                                             {activityId === 'untracked' && (
@@ -331,7 +321,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                     onClick={handleSave}
                     className="w-full bg-[#1c1c1c] hover:bg-[#2a2a2a] py-4 rounded-[14px] text-gray-300 font-bold text-sm tracking-widest uppercase active:scale-[0.98] transition-all cursor-pointer"
                 >
-                    Save
+                    {t('common.save')}
                 </button>
             </div>
         </motion.div>

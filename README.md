@@ -225,17 +225,79 @@ Uygulama harici bir sunucuya veri göndermez, analitik/telemetri içermez ve çe
 
 ## İlham
 
-Bu proje, Android platformundaki popüler açık kaynaklı [Simple Time Tracker](https://github.com/astubenbord/simple-time-tracker) uygulamasından ilham alınarak modern web ve PWA standartlarıyla sıfırdan geliştirilmiştir.
+Bu proje, Android platformundaki popüler açık kaynaklı [Simple Time Tracker](https://github.com/Razeeman/Android-SimpleTimeTracker) uygulamasından ilham alınarak modern web ve PWA standartlarıyla sıfırdan geliştirilmiştir.
 
 <br>
 
 ## Katkıda Bulunma
 
 1. Depoyu forklayın (`Fork`).
-2. Özellik dalı oluşturun (`git checkout -b feature/yeni-ozellik`).
+2. Özellik veya düzeltme dalı oluşturun (`git checkout -b feature/yeni-ozellik`).
 3. Değişikliklerinizi commit edin (`git commit -m 'feat: add new feature'`).
 4. Dalınıza push yapın (`git push origin feature/yeni-ozellik`).
 5. Bir Pull Request açın.
+
+<br>
+
+### 🌐 Yeni Bir Dil Desteği Eklemek (i18n Translation Guide)
+
+Vukuf, tüm dünyadaki kullanıcıların kendi ana dillerinde en pürüzsüz deneyimi yaşaması için modüler ve genişletilebilir bir **i18n (Internationalization)** mimarisine sahiptir. Uygulamaya yeni bir dil eklemek son derece basittir:
+
+#### 1. Çeviri Dosyasını Hazırlayın
+`src/locales/en.ts` dosyasını referans alarak eklemek istediğiniz dilin ISO 639-1 koduyla yeni bir dosya oluşturun (örneğin Almanca için `src/locales/de.ts`, İspanyolca için `src/locales/es.ts`):
+
+```bash
+cp src/locales/en.ts src/locales/de.ts
+```
+
+Dosya içindeki string değerlerini hedef dile çevirin. `{{count}}`, `{{time}}`, `{{activity}}` gibi dinamik parametreleri aynen koruyun.
+
+#### 2. i18n Konfigürasyonuna Dahil Edin
+[`src/locales/i18n.ts`](src/locales/i18n.ts) dosyasını açıp yeni dil dosyasını `resources` nesnesine ekleyin:
+
+```typescript
+import de from './de';
+
+export const resources = {
+  tr: { translation: tr },
+  en: { translation: en },
+  de: { translation: de }, // Yeni dil
+};
+```
+
+#### 3. Dil Kayıt Merkezine Ekleyin
+[`src/locales/languages.ts`](src/locales/languages.ts) dosyasındaki `LANGUAGES` listesinde ilgili dilin `available` değerini `true` yapın veya yeni bir dil ise ekleyin:
+
+```typescript
+{
+  code: 'de',
+  name: 'Deutsch',         // Dilin özgün yerel adı
+  englishName: 'German',   // İngilizce karşılığı
+  region: 'Deutschland',   // Bölge / Ülke
+  flag: '🇩🇪',             // Bayrak simgesi
+  badge: 'DE',             // 2 harfli ISO rozeti
+  available: true,         // Aktif ve kullanılabilir
+}
+```
+
+#### 4. Tip Kontrolü ve Test
+Tüm çeviri anahtarlarının tam olduğunu doğrulamak için TypeScript derleyicisini çalıştırın:
+
+```bash
+npx tsc --noEmit
+npm run dev
+```
+
+Uygulama açıldığında **Ayarlar → Dil Seçimi** ekranında yeni dilinizi seçip arayüzün sorunsuz çalıştığını kontrol edin.
+
+#### 5. Pull Request Açın
+Değişikliklerinizi commit edip dalınızı gönderin:
+
+```bash
+git checkout -b i18n/add-german
+git commit -m "feat(i18n): add German (de) language translation"
+git push origin i18n/add-german
+```
 
 <br>
 

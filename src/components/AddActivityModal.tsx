@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, Trash2, Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { PRESET_COLORS, getContrastColor } from '../utils/colors';
 import {
@@ -21,6 +22,7 @@ interface AddActivityModalProps {
 }
 
 export default function AddActivityModal({ isOpen, onClose, editingId }: AddActivityModalProps) {
+    const { t } = useTranslation();
     const { addRecordType, updateRecordType, deleteRecordType, recordTypes } = useStore();
     const nameRef = useRef<HTMLInputElement>(null);
 
@@ -33,6 +35,15 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
     const [iconSearch, setIconSearch] = useState('');
     const [iconCategory, setIconCategory] = useState<IconCategory>('popular');
     const [visibleCount, setVisibleCount] = useState(64);
+
+    const categoryLabels: Record<IconCategory, string> = useMemo(() => ({
+        popular: t('addActivity.catPopular'),
+        work: t('addActivity.catWork'),
+        fitness: t('addActivity.catFitness'),
+        lifestyle: t('addActivity.catLifestyle'),
+        food: t('addActivity.catFood'),
+        all: t('addActivity.catAll'),
+    }), [t]);
 
     // If editing, populate form
     useEffect(() => {
@@ -102,7 +113,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
     };
 
     const handleDelete = () => {
-        if (editingId && window.confirm('Bu aktiviteyi kaldırmak istediğinden emin misin? Ona bağlı olan geçmiş tüm kayıtlar da kalıcı olarak silinecek!')) {
+        if (editingId && window.confirm(t('addActivity.deleteConfirm'))) {
             deleteRecordType(editingId);
             onClose();
         }
@@ -132,10 +143,11 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                             {/* Header */}
                             <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0 bg-white dark:bg-gray-900 z-10">
                                 <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50">
-                                    {editingId ? 'Edit Activity' : 'New Activity'}
+                                    {editingId ? t('addActivity.titleEdit') : t('addActivity.titleNew')}
                                 </h2>
                                 <button
                                     onClick={onClose}
+                                    aria-label={t('common.close')}
                                     className="w-8 h-8 flex-shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                 >
                                     <X size={16} />
@@ -162,14 +174,14 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                     {/* Name */}
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                            Activity Name
+                                            {t('addActivity.nameLabel')}
                                         </label>
                                         <input
                                             ref={nameRef}
                                             type="text"
                                             value={name}
                                             onChange={(e) => setName(e.target.value)}
-                                            placeholder="e.g. Deep Work, Exercise..."
+                                            placeholder={t('addActivity.namePlaceholder')}
                                             maxLength={32}
                                             className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
                                         />
@@ -178,7 +190,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                     {/* Color Picker */}
                                     <div className="space-y-2">
                                         <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                            Color
+                                            {t('addActivity.colorLabel')}
                                         </label>
                                         <div className="flex flex-wrap gap-2 items-center">
                                             {/* Preset Colors */}
@@ -221,7 +233,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
                                             <label className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                                Icon
+                                                {t('addActivity.iconLabel')}
                                             </label>
                                             {/* Tab switch */}
                                             <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
@@ -233,7 +245,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                                         : 'text-gray-400 dark:text-gray-500'
                                                         }`}
                                                 >
-                                                    Icons
+                                                    {t('addActivity.tabIcons')}
                                                 </button>
                                                 <button
                                                     type="button"
@@ -243,7 +255,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                                         : 'text-gray-400 dark:text-gray-500'
                                                         }`}
                                                 >
-                                                    Emoji
+                                                    {t('addActivity.tabEmoji')}
                                                 </button>
                                             </div>
                                         </div>
@@ -259,7 +271,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                                         type="text"
                                                         value={iconSearch}
                                                         onChange={(e) => setIconSearch(e.target.value)}
-                                                        placeholder="Search 1,900+ icons (e.g. coffee, book, gym)..."
+                                                        placeholder={t('addActivity.searchPlaceholder')}
                                                         className="w-full pl-8 pr-8 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                                     />
                                                     {iconSearch && (
@@ -286,7 +298,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                                                     : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                                                                     }`}
                                                             >
-                                                                {cat.label}
+                                                                {categoryLabels[cat.id] || cat.label}
                                                             </button>
                                                         ))}
                                                     </div>
@@ -312,7 +324,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
 
                                                     {filteredIcons.length === 0 && (
                                                         <div className="col-span-8 py-6 text-center text-xs text-gray-400 dark:text-gray-500">
-                                                            No icons found matching "{iconSearch}"
+                                                            {t('addActivity.noIconsFound', { query: iconSearch })}
                                                         </div>
                                                     )}
                                                 </div>
@@ -324,7 +336,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                                         onClick={() => setVisibleCount((c) => c + 64)}
                                                         className="w-full py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
                                                     >
-                                                        Show more (+{Math.min(64, filteredIcons.length - visibleCount)} remaining)
+                                                        {t('addActivity.showMore', { count: Math.min(64, filteredIcons.length - visibleCount) })}
                                                     </button>
                                                 )}
                                             </div>
@@ -338,7 +350,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                                         setEmojiInput(val);
                                                         if (val.trim()) setIcon(val.trim());
                                                     }}
-                                                    placeholder="Emoji veya metin: 📌 🎯 💻 🎮 ..."
+                                                    placeholder={t('addActivity.emojiPlaceholder')}
                                                     maxLength={4}
                                                     className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
                                                 />
@@ -370,7 +382,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                                 onClick={handleDelete}
                                                 className="w-full flex items-center justify-center gap-2 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 py-3.5 rounded-xl text-sm font-semibold transition-colors"
                                             >
-                                                <Trash2 size={16} /> Delete Activity
+                                                <Trash2 size={16} /> {t('addActivity.deleteActivity')}
                                             </button>
                                         </div>
                                     )}
@@ -387,7 +399,7 @@ export default function AddActivityModal({ isOpen, onClose, editingId }: AddActi
                                             color: name.trim() ? getContrastColor(color) : undefined,
                                         }}
                                     >
-                                        {editingId ? 'Save Changes' : 'Add Activity'}
+                                        {editingId ? t('addActivity.saveChanges') : t('addActivity.addBtn')}
                                     </button>
                                 </div>
                             </form>

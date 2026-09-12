@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Flame, Calendar, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Record as TimeRecord, RecordType, RunningRecord } from '../types';
 import type { ViewMode } from './DateSelectorBar';
 import { formatDuration, splitRecordByDays } from '../utils/time';
@@ -25,9 +26,6 @@ interface DayData {
     isCurrentMonth?: boolean;
     isToday?: boolean;
 }
-
-const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function formatDateKey(d: Date): string {
     const y = d.getFullYear();
@@ -74,6 +72,24 @@ export default function ActivityHeatmap({
     title,
     className,
 }: ActivityHeatmapProps) {
+    const { t, i18n } = useTranslation();
+    const locale = i18n.language.startsWith('tr') ? 'tr-TR' : 'en-US';
+
+    const weekdayShort = useMemo(() => {
+        return Array.from({ length: 7 }, (_, idx) => {
+            // Monday is Jan 5, 1970
+            const d = new Date(1970, 0, 5 + idx);
+            return d.toLocaleDateString(locale, { weekday: 'short' });
+        });
+    }, [locale]);
+
+    const monthNames = useMemo(() => {
+        return Array.from({ length: 12 }, (_, m) => {
+            const d = new Date(2020, m, 1);
+            return d.toLocaleDateString(locale, { month: 'short' });
+        });
+    }, [locale]);
+
     // Hidden in daily view
     if (viewMode === 'day') return null;
 
@@ -167,7 +183,7 @@ export default function ActivityHeatmap({
                 const rt = recordTypes.find((t) => t.id === typeId);
                 activities.push({
                     id: typeId,
-                    name: rt ? rt.name : typeId === 'untracked' ? 'Untracked' : 'Activity',
+                    name: rt ? rt.name : typeId === 'untracked' ? t('home.untracked') : t('common.activity'),
                     color: rt ? rt.color : '#9ca3af',
                     duration: dur,
                 });
@@ -232,7 +248,7 @@ export default function ActivityHeatmap({
 
             let monthLabel: string | undefined;
             if (firstDayInWeekMonth !== -1 && firstDayInWeekMonth !== lastMonthLabeled) {
-                monthLabel = MONTH_NAMES[firstDayInWeekMonth];
+                monthLabel = monthNames[firstDayInWeekMonth];
                 lastMonthLabeled = firstDayInWeekMonth;
             }
 
@@ -247,7 +263,7 @@ export default function ActivityHeatmap({
         }
 
         return weeks;
-    }, [viewMode, selectedDate, dailyMap, maxDayDuration, recordTypes]);
+    }, [viewMode, selectedDate, dailyMap, maxDayDuration, recordTypes, monthNames]);
 
     // ── MONTH VIEW: 7 Columns (Mon..Sun) Calendar Heatmap ──
     const monthGridData = useMemo(() => {
@@ -332,10 +348,10 @@ export default function ActivityHeatmap({
                         </div>
                         <div>
                             <h3 className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
-                                {title || (viewMode === 'year' ? 'Commit & Activity Heatmap' : 'Monthly Activity Heatmap')}
+                                {title || (viewMode === 'year' ? t('heatmap.yearTitle') : t('heatmap.monthTitle'))}
                             </h3>
                             <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                                {periodActiveDays} active days • {bestStreak > 0 ? `Streak: ${bestStreak}d` : 'Daily consistency'}
+                                {t('heatmap.activeDays', { count: periodActiveDays })} • {bestStreak > 0 ? t('heatmap.streak', { count: bestStreak }) : t('heatmap.dailyConsistency')}
                             </p>
                         </div>
                     </div>
@@ -344,7 +360,7 @@ export default function ActivityHeatmap({
                     {bestStreak > 0 && (
                         <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-bold">
                             <Flame size={13} className="fill-amber-500 text-amber-500" />
-                            <span>{currentStreak > 0 ? `${currentStreak}d streak` : `${bestStreak}d best`}</span>
+                            <span>{currentStreak > 0 ? t('heatmap.currentStreak', { count: currentStreak }) : t('heatmap.bestStreak', { count: bestStreak })}</span>
                         </div>
                     )}
                 </div>
@@ -373,9 +389,9 @@ export default function ActivityHeatmap({
                                 <div className="flex gap-[3px]">
                                     {/* Weekday labels on left: Mon (0), Wed (2), Fri (4) */}
                                     <div className="flex flex-col justify-between text-[9px] text-gray-400 dark:text-gray-500 font-semibold pr-1.5 h-[116px] select-none">
-                                        <span>Mon</span>
-                                        <span>Wed</span>
-                                        <span>Fri</span>
+                                        <span>{weekdayShort[0]}</span>
+                                        <span>{weekdayShort[2]}</span>
+                                        <span>{weekdayShort[4]}</span>
                                     </div>
 
                                     {/* Weeks columns */}
@@ -415,14 +431,14 @@ export default function ActivityHeatmap({
                                                                 ? { backgroundColor: bg }
                                                                 : undefined
                                                         }
-                                                        title={`${day.date.toLocaleDateString([], {
+                                                        title={`${day.date.toLocaleDateString(locale, {
                                                             weekday: 'short',
                                                             month: 'short',
                                                             day: 'numeric',
                                                         })}: ${
                                                             day.totalDuration > 0
-                                                                ? formatDuration(day.totalDuration)
-                                                                : 'No activity'
+                                                                ? formatDuration(day.totalDuration, i18n.language)
+                                                                : t('heatmap.noActivity')
                                                         }`}
                                                     />
                                                 );
@@ -440,8 +456,8 @@ export default function ActivityHeatmap({
                     <div className="space-y-2">
                         {/* Weekday headers */}
                         <div className="grid grid-cols-7 gap-1.5 text-center text-[10px] font-bold text-gray-400 dark:text-gray-500">
-                            {WEEKDAY_SHORT.map((wd) => (
-                                <span key={wd}>{wd}</span>
+                            {weekdayShort.map((wd, i) => (
+                                <span key={i}>{wd}</span>
                             ))}
                         </div>
 
@@ -506,7 +522,7 @@ export default function ActivityHeatmap({
                                                         : 'text-gray-600 dark:text-gray-400'
                                                 }`}
                                             >
-                                                {formatDuration(day.totalDuration)}
+                                                {formatDuration(day.totalDuration, i18n.language)}
                                             </span>
                                         )}
                                     </button>
@@ -522,7 +538,7 @@ export default function ActivityHeatmap({
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
-                                    {selectedDay.date.toLocaleDateString([], {
+                                    {selectedDay.date.toLocaleDateString(locale, {
                                         weekday: 'long',
                                         day: 'numeric',
                                         month: 'long',
@@ -531,7 +547,7 @@ export default function ActivityHeatmap({
                                 </span>
                                 {selectedDay.isToday && (
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                                        Today
+                                        {t('heatmap.today')}
                                     </span>
                                 )}
                             </div>
@@ -547,8 +563,8 @@ export default function ActivityHeatmap({
                         <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-500 dark:text-gray-400">
                                 {selectedDay.sessionCount > 0
-                                    ? `${selectedDay.sessionCount} sessions tracked`
-                                    : 'No sessions recorded on this day'}
+                                    ? t('heatmap.sessionsTracked', { count: selectedDay.sessionCount })
+                                    : t('heatmap.noSessions')}
                             </span>
                             <span
                                 className="text-xs font-bold px-2 py-0.5 rounded-md"
@@ -558,8 +574,8 @@ export default function ActivityHeatmap({
                                 }}
                             >
                                 {selectedDay.totalDuration > 0
-                                    ? formatDuration(selectedDay.totalDuration)
-                                    : '0m'}
+                                    ? formatDuration(selectedDay.totalDuration, i18n.language)
+                                    : formatDuration(0, i18n.language)}
                             </span>
                         </div>
 
@@ -579,7 +595,7 @@ export default function ActivityHeatmap({
                                             {act.name}
                                         </span>
                                         <span className="text-gray-400 dark:text-gray-400 font-mono">
-                                            {formatDuration(act.duration)}
+                                            {formatDuration(act.duration, i18n.language)}
                                         </span>
                                     </span>
                                 ))}
@@ -591,10 +607,10 @@ export default function ActivityHeatmap({
                 {/* ── Legend ── */}
                 <div className="flex items-center justify-between text-[11px] text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-100 dark:border-neutral-800">
                     <span className="text-[10px]">
-                        {viewMode === 'year' ? '52-week activity' : 'Monthly consistency'}
+                        {viewMode === 'year' ? t('heatmap.yearLegend') : t('heatmap.monthLegend')}
                     </span>
                     <div className="flex items-center gap-1">
-                        <span className="text-[10px] mr-0.5">Less</span>
+                        <span className="text-[10px] mr-0.5">{t('heatmap.less')}</span>
                         <span className="w-2.5 h-2.5 rounded-[2px] bg-gray-100 dark:bg-neutral-800 border border-gray-200/50 dark:border-neutral-700/40" />
                         <span
                             className="w-2.5 h-2.5 rounded-[2px]"
@@ -618,7 +634,7 @@ export default function ActivityHeatmap({
                             className="w-2.5 h-2.5 rounded-[2px]"
                             style={{ backgroundColor: getLevelBg(4, customColor) }}
                         />
-                        <span className="text-[10px] ml-0.5">More</span>
+                        <span className="text-[10px] ml-0.5">{t('heatmap.more')}</span>
                     </div>
                 </div>
             </div>

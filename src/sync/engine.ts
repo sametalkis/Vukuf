@@ -11,10 +11,11 @@ interface UploadJob { id: string; boxes: CipherBox[]; operationIds: string[]; ro
 export interface Device { id: string; role: string; created: number; seen: number }
 interface SyncStatus {
     ready: boolean; busy: boolean; connected: boolean; vaultId?: string; deviceId?: string; role?: string;
-    message: string; error: string | null; pending: number; lastSync: number | null;
+    message: string; messageKey?: string; messageParams?: Record<string, unknown>;
+    error: string | null; errorCode?: string | null; pending: number; lastSync: number | null;
     conflicts: Conflict[]; activeSessions: SessionValue[]; invitePending: boolean;
 }
-let state: SyncStatus = { ready: false, busy: false, connected: false, message: 'Yerel veriler hazırlanıyor…', error: null, pending: 0, lastSync: null, conflicts: [], activeSessions: [], invitePending: false };
+let state: SyncStatus = { ready: false, busy: false, connected: false, message: 'Yerel veriler hazırlanıyor…', messageKey: 'sync.statusPreparingLocal', error: null, errorCode: null, pending: 0, lastSync: null, conflicts: [], activeSessions: [], invitePending: false };
 const listeners = new Set<() => void>();
 function update(patch: Partial<SyncStatus>) { state = { ...state, ...patch }; listeners.forEach(fn => fn()); }
 export const useSyncStatus = () => useSyncExternalStore(fn => { listeners.add(fn); return () => { listeners.delete(fn); }; }, () => state);
@@ -83,13 +84,18 @@ export function startSync() {
         try {
             await reloadProjection();
             const pending = await getMeta<string>('pairLink');
-            update({ ready: true, message: credential ? 'Eşitleme bekleniyor' : 'Bu cihazda kayıtlı', invitePending: !!pending });
+            update({
+                ready: true,
+                message: credential ? 'Eşitleme bekleniyor' : 'Bu cihazda kayıtlı',
+                messageKey: credential ? 'sync.statusWaitingSync' : 'sync.statusSavedLocally',
+                invitePending: !!pending
+            });
             void syncNow(false);
-        } catch (error) { update({ error: String(error), message: 'Yerel veri yüklenemedi' }); }
+        } catch (error) { update({ error: String(error), message: 'Yerel veri yüklenemedi', messageKey: 'sync.statusLocalLoadFailed' }); }
     };
     if (useStore.persist.hasHydrated()) void onReady(); else useStore.persist.onFinishHydration(() => { void onReady(); });
     window.addEventListener('online', () => { retryAfter = 0; void syncNow(false); });
-    window.addEventListener('offline', () => update({ message: 'Çevrimdışı — değişiklikler bu cihazda saklanıyor' }));
+    window.addEventListener('offline', () => update({ message: 'Çevrimdışı — değişiklikler bu cihazda saklanıyor', messageKey: 'sync.statusOffline' }));
     document.addEventListener('visibilitychange', () => { if (!document.hidden) void syncNow(false); });
     setInterval(() => { if (!document.hidden) void syncNow(false); }, 30000);
     void capturePairLink();
@@ -146,7 +152,7 @@ async function prepareJob(ops: Operation[], auth: Credentials, rotate = false): 
     if (group.length || !groups.length) groups.push(group);
     const id = randomUUID(), boxes: CipherBox[] = [];
     for (let index = 0; index < groups.length; index++) {
-        update({ message: `Şifreleniyor: ${index + 1}/${groups.length} parça` });
+        update({ message: `Şifreleniyor: ${index + 1}/${groups.length} parça`, messageKey: 'sync.statusEncrypting', messageParams: { current: index + 1, total: groups.length } });
         boxes.push(await seal(auth.key, await encode(groups[index]), `data:${auth.vaultId}:${auth.keyVersion}:${id}:${index}`, auth.keyVersion));
         await new Promise(resolve => setTimeout(resolve, 0));
     }
@@ -158,7 +164,7 @@ async function sendJob(job: UploadJob) {
     const begun = await api<{ complete: boolean }>(root, 'POST', { count: job.boxes.length, keyVersion: auth.keyVersion, rotate: job.rotate, ...(job.rotate ? { recoveryHash: await digest(auth.recoveryToken!), expectedSeq: job.expectedSeq } : {}) });
     if (!begun.complete) {
         for (let i = 0; i < job.boxes.length; i++) {
-            update({ message: `Yükleniyor: ${i + 1}/${job.boxes.length} parça` });
+            update({ message: `Yükleniyor: ${i + 1}/${job.boxes.length} parça`, messageKey: 'sync.statusUploading', messageParams: { current: i + 1, total: job.boxes.length } });
             await api(`${root}/${i}`, 'PUT', job.boxes[i]);
         }
         try { await api(`${root}/commit`, 'POST', {}); } catch (error) {
@@ -203,7 +209,7 @@ async function cycle() {
     await pull();
     await reloadProjection();
     const now = Date.now(); await setMeta('lastSync', now);
-    update({ lastSync: now, message: 'Eşitlendi', error: null });
+    update({ lastSync: now, message: 'Eşitlendi', messageKey: 'sync.statusSynced', error: null, errorCode: null });
 }
 export async function syncNow(manual = true) {
     if (!state.ready) {
@@ -220,10 +226,10 @@ export async function syncNow(manual = true) {
         }
         if (syncing) return;
     }
-    if (!navigator.onLine) { update({ message: 'Çevrimdışı — değişiklikler bu cihazda saklanıyor' }); return; }
-    syncing = true; update({ busy: true, message: 'Eşitleniyor…' });
+    if (!navigator.onLine) { update({ message: 'Çevrimdışı — değişiklikler bu cihazda saklanıyor', messageKey: 'sync.statusOffline' }); return; }
+    syncing = true; update({ busy: true, message: 'Eşitleniyor…', messageKey: 'sync.statusSyncing' });
     try { await exclusively(cycle); failures = 0; retryAfter = 0; }
-    catch (error) { failures++; retryAfter = Date.now() + Math.min(300000, 5000 * 2 ** failures); update({ error: error instanceof Error ? error.message : 'Eşitleme başarısız.', message: 'Gönderimler bekliyor' }); }
+    catch (error) { failures++; retryAfter = Date.now() + Math.min(300000, 5000 * 2 ** failures); update({ error: error instanceof Error ? error.message : 'Eşitleme başarısız.', errorCode: (error as { code?: string })?.code || null, message: 'Gönderimler bekliyor', messageKey: 'sync.statusUploadsPending' }); }
     finally { syncing = false; update({ busy: false }); }
 }
 async function action<T>(fn: () => Promise<T>): Promise<T> {
@@ -313,7 +319,7 @@ export async function disconnect() {
         }
         credential = undefined;
         for (const key of ['credentials', 'cursor', 'uploadJob', 'pendingCreate', 'joining', 'pairLink']) await setMeta(key, undefined);
-        update({ connected: false, invitePending: false, message: 'Bağlantı kaldırıldı. Yerel kayıtlar korunuyor.' });
+        update({ connected: false, invitePending: false, message: 'Bağlantı kaldırıldı. Yerel kayıtlar korunuyor.', messageKey: 'sync.statusConnectionRemoved' });
     });
 }
 export async function deleteVault() {
@@ -323,7 +329,7 @@ export async function deleteVault() {
         credential = undefined;
         await setMeta('credentials', undefined);
         await setMeta('uploadJob', undefined);
-        update({ message: 'Bulut kasası silindi. Yerel kayıtlar korunuyor.' });
+        update({ message: 'Bulut kasası silindi. Yerel kayıtlar korunuyor.', messageKey: 'sync.statusVaultDeleted' });
     });
 }
 export async function rotateKey() {
@@ -334,7 +340,7 @@ export async function rotateKey() {
         const expectedSeq = (await getMeta<number>('cursor')) ?? 0;
         const next = { ...auth, ...(await storeKey(randomSecret())), keyVersion: auth.keyVersion + 1, recoveryToken: randomSecret() };
         const job = await prepareJob(await allOperations(), next, true); job.expectedSeq = expectedSeq; await setMeta('uploadJob', job); await sendJob(job); await cycle();
-        update({ message: 'Anahtar yenilendi. Diğer cihazları yeniden eşleştirin ve yeni kurtarma paketi oluşturun.' });
+        update({ message: 'Anahtar yenilendi. Diğer cihazları yeniden eşleştirin ve yeni kurtarma paketi oluşturun.', messageKey: 'sync.statusKeyRenewed' });
     });
 }
 export async function recoveryPackage(): Promise<{ code: string; file: string }> {

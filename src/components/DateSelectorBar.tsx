@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { Check, MoreVertical } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 
 export type ViewMode = 'day' | 'month' | 'year' | 'all';
@@ -11,12 +12,12 @@ interface DateSelectorBarProps {
     setSelectedDate: (date: Date) => void;
 }
 
-const RANGE_OPTIONS = [
-    { id: 'day', label: 'Day' },
-    { id: 'month', label: 'Month' },
-    { id: 'year', label: 'Year' },
-    { id: 'all', label: 'All Time' },
-] as const;
+const RANGE_OPTION_KEYS: { id: ViewMode; key: string }[] = [
+    { id: 'day', key: 'dateSelector.day' },
+    { id: 'month', key: 'dateSelector.month' },
+    { id: 'year', key: 'dateSelector.year' },
+    { id: 'all', key: 'dateSelector.all' },
+];
 
 export default function DateSelectorBar({
     viewMode,
@@ -24,6 +25,8 @@ export default function DateSelectorBar({
     selectedDate,
     setSelectedDate,
 }: DateSelectorBarProps) {
+    const { t, i18n } = useTranslation();
+    const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-US';
     const [showRangeMenu, setShowRangeMenu] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const { records } = useStore();
@@ -46,9 +49,9 @@ export default function DateSelectorBar({
             const curr = new Date(earliestDate);
             while (curr <= now) {
                 const isSelected = selectedDate.toDateString() === curr.toDateString();
-                const dayStr = curr.toLocaleDateString('en-US', { weekday: 'short' });
+                const dayStr = curr.toLocaleDateString(locale, { weekday: 'short' });
                 const monthStr = isSelected
-                    ? curr.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
+                    ? curr.toLocaleDateString(locale, { month: 'short' }).toUpperCase()
                     : undefined;
                 items.push({ label: curr.getDate().toString(), subLabel: dayStr, monthLabel: monthStr, date: new Date(curr), isSelected });
                 curr.setDate(curr.getDate() + 1);
@@ -57,7 +60,7 @@ export default function DateSelectorBar({
             const curr = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
             while (curr <= now) {
                 const isSelected = selectedDate.getFullYear() === curr.getFullYear() && selectedDate.getMonth() === curr.getMonth();
-                items.push({ label: curr.toLocaleDateString('en-US', { month: 'short' }), subLabel: curr.getFullYear().toString(), date: new Date(curr), isSelected });
+                items.push({ label: curr.toLocaleDateString(locale, { month: 'short' }), subLabel: curr.getFullYear().toString(), date: new Date(curr), isSelected });
                 curr.setMonth(curr.getMonth() + 1);
             }
         } else if (viewMode === 'year') {
@@ -69,7 +72,7 @@ export default function DateSelectorBar({
             }
         }
         return items;
-    }, [viewMode, selectedDate, records]);
+    }, [viewMode, selectedDate, records, locale]);
 
     const [isDragging, setIsDragging] = useState(false);
     const dragStartXRef = useRef(0);
@@ -160,7 +163,7 @@ export default function DateSelectorBar({
                 >
                     {viewMode === 'all' ? (
                         <div className="flex-1 text-center text-sm font-semibold text-gray-500 py-3">
-                            Showing all history
+                            {t('dateSelector.allHistory')}
                         </div>
                     ) : (
                         selectorItems.map((item, idx) => (
@@ -223,7 +226,7 @@ export default function DateSelectorBar({
                                 onClick={() => setShowRangeMenu(false)}
                             />
                             <div className="absolute right-1 bottom-full mb-3 w-44 bg-white/95 dark:bg-[#1c1c1c]/95 backdrop-blur-xl rounded-2xl shadow-2xl z-50 overflow-hidden border border-black/10 dark:border-white/15 font-medium">
-                                {RANGE_OPTIONS.map(item => {
+                                {RANGE_OPTION_KEYS.map(item => {
                                     const isSelected = viewMode === item.id;
                                     return (
                                         <button
@@ -238,7 +241,7 @@ export default function DateSelectorBar({
                                                 color: 'var(--primary, #ff9100)'
                                             } : undefined}
                                         >
-                                            {item.label}
+                                            {t(item.key)}
                                             {isSelected && <Check size={16} style={{ color: 'var(--primary, #ff9100)' }} />}
                                         </button>
                                     );

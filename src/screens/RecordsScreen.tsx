@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Clock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { formatDuration, splitRecordByDays } from '../utils/time';
 import DateSelectorBar from '../components/DateSelectorBar';
@@ -23,21 +24,23 @@ function sameDay(a: Date, b: Date): boolean {
     );
 }
 
-function getDayLabel(iso: string): string {
+function getDayLabel(iso: string, t: (key: string) => string, locale: string): string {
     const date = new Date(iso);
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
 
-    if (sameDay(date, today)) return 'Today';
-    if (sameDay(date, yesterday)) return 'Yesterday';
-    return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+    if (sameDay(date, today)) return t('common.today');
+    if (sameDay(date, yesterday)) return t('common.yesterday');
+    return date.toLocaleDateString(locale, { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
 function groupByDay(
     records: (Record & { isRunning?: boolean; originalRecord?: Record })[],
     showUntracked: boolean,
-    viewContext?: { mode: ViewMode; date: Date }
+    viewContext: { mode: ViewMode; date: Date } | undefined,
+    t: (key: string) => string,
+    locale: string
 ): { label: string; date: string; records: (Record & { isRunning?: boolean })[] }[] {
     const dayMap = new Map<string, { dateObj: Date; records: (Record & { isRunning?: boolean })[] }>();
 
@@ -66,7 +69,7 @@ function groupByDay(
 
     // 2. Process each day
     for (const [dateKey, { dateObj, records: dayRecords }] of dayMap.entries()) {
-        const label = getDayLabel(dateObj.toISOString());
+        const label = getDayLabel(dateObj.toISOString(), t, locale);
 
         if (!showUntracked) {
             const sorted = [...dayRecords].sort(
@@ -98,45 +101,52 @@ function groupByDay(
         // Merge overlapping / contiguous intervals
         intervals.sort((a, b) => a.start - b.start);
         const merged: { start: number; end: number }[] = [];
-        for (const iv of intervals) {
+        for (const int of intervals) {
             if (merged.length === 0) {
-                merged.push({ ...iv });
+                merged.push({ ...int });
             } else {
-                const last = merged[merged.length - 1];
-                if (iv.start <= last.end) {
-                    last.end = Math.max(last.end, iv.end);
+                const prev = merged[merged.length - 1];
+                if (int.start <= prev.end) {
+                    prev.end = Math.max(prev.end, int.end);
                 } else {
-                    merged.push({ ...iv });
+                    merged.push({ ...int });
                 }
             }
         }
 
-        // Generate untracked gaps
+        // Fill gaps >= 60s as Untracked records
         const untrackedRecords: (Record & { isRunning?: boolean })[] = [];
         let cursor = dayStart;
 
-        for (const iv of merged) {
-            if (iv.start - cursor >= 60000) { // >= 1 minute
-                untrackedRecords.push({
-                    id: `untracked-${new Date(cursor).toISOString()}-${new Date(iv.start).toISOString()}`,
-                    recordTypeId: 'untracked',
-                    startTime: new Date(cursor).toISOString(),
-                    endTime: new Date(iv.start).toISOString(),
-                    duration: Math.floor((iv.start - cursor) / 1000),
-                });
+        for (const occ of merged) {
+            if (occ.start > cursor) {
+                const dur = Math.floor((occ.start - cursor) / 1000);
+                if (dur >= 60) {
+                    untrackedRecords.push({
+                        id: `untracked-${dateKey}-${cursor}`,
+                        recordTypeId: 'untracked',
+                        startTime: new Date(cursor).toISOString(),
+                        endTime: new Date(occ.start).toISOString(),
+                        duration: dur,
+                    });
+                }
             }
-            cursor = Math.max(cursor, iv.end);
+            cursor = Math.max(cursor, occ.end);
         }
 
-        if (dayEnd - cursor >= 60000) {
-            untrackedRecords.push({
-                id: `untracked-${new Date(cursor).toISOString()}-${new Date(dayEnd).toISOString()}`,
-                recordTypeId: 'untracked',
-                startTime: new Date(cursor).toISOString(),
-                endTime: new Date(dayEnd).toISOString(),
-                duration: Math.floor((dayEnd - cursor) / 1000),
-                isRunning: isToday,
-            });
+        // Tail gap up to dayEnd
+        if (dayEnd > cursor) {
+            const dur = Math.floor((dayEnd - cursor) / 1000);
+            if (dur >= 60) {
+                untrackedRecords.push({
+                    id: `untracked-${dateKey}-${cursor}`,
+                    recordTypeId: 'untracked',
+                    startTime: new Date(cursor).toISOString(),
+                    endTime: new Date(dayEnd).toISOString(),
+                    duration: dur,
+                    isRunning: isToday,
+                });
+            }
         }
 
         const combined = [...activeRecords, ...untrackedRecords].sort(
@@ -160,6 +170,7 @@ function dayTotal(records: (Record & { isRunning?: boolean })[]): string {
 
 // ─── Record Row ────────────────────────────────────────────────────────────────
 function RecordRow({ record, onEdit }: { record: Record & { isRunning?: boolean }; onEdit: () => void }) {
+    const { t } = useTranslation();
     const { recordTypes } = useStore();
 
     // Live tick for running timer duration
@@ -181,7 +192,7 @@ function RecordRow({ record, onEdit }: { record: Record & { isRunning?: boolean 
     if (record.recordTypeId === 'untracked') {
         return (
             <TrackingCard
-                name="Untracked Time"
+                name={t('timer.untrackedTitle')}
                 icon="Clock"
                 color="#6b7280"
                 subtitleLeft={formatTime(record.startTime)}
@@ -211,6 +222,8 @@ function RecordRow({ record, onEdit }: { record: Record & { isRunning?: boolean 
 // ─── Records Screen ────────────────────────────────────────────────────────────
 
 export default function RecordsScreen() {
+    const { t, i18n } = useTranslation();
+    const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-US';
     const { records, runningRecord } = useStore();
     const [editingRecord, setEditingRecord] = useState<(Record & { isRunning?: boolean }) | null>(null);
 
@@ -227,26 +240,28 @@ export default function RecordsScreen() {
         return () => clearInterval(interval);
     }, [runningRecord]);
 
+    // Update selectedDate when viewMode changes
     const handleSetSelectedDate = (date: Date) => {
         setSelectedDate(date);
         setLimit(50);
     };
 
-    const handleEditRecord = (record: any) => {
-        // If this row is a split chunk of a multi-day record, retrieve the true full original record
-        const target = record.originalRecord || record;
-
-        if (runningRecord && runningRecord.id === target.id) {
-            const nowIso = new Date().toISOString();
+    const handleEditRecord = (rec: Record & { isRunning?: boolean }) => {
+        // If it's a split-day chunk, edit the master/original record interval!
+        const target = (rec as any).originalRecord || rec;
+        const storeRecord = records.find(r => r.id === target.id);
+        if (storeRecord) {
+            setEditingRecord(storeRecord);
+        } else if (target.id.startsWith('untracked-')) {
+            // Dynamically computed untracked block converted to editable draft
             setEditingRecord({
-                ...runningRecord,
-                endTime: nowIso,
-                duration: Math.max(0, Math.floor((Date.now() - new Date(runningRecord.startTime).getTime()) / 1000)),
-                isRunning: true,
+                id: target.id,
+                recordTypeId: 'untracked',
+                startTime: target.startTime,
+                endTime: target.endTime,
+                duration: target.duration,
+                isRunning: target.isRunning,
             });
-        } else {
-            const storeRecord = records.find(r => r.id === target.id);
-            setEditingRecord(storeRecord || target);
         }
     };
 
@@ -291,8 +306,8 @@ export default function RecordsScreen() {
     const hasMore = limit < sortedRecords.length;
     const showUntracked = useStore(s => s.showUntrackedTime);
     const groups = useMemo(() => {
-        return groupByDay(visibleRecords, showUntracked, { mode: viewMode, date: selectedDate });
-    }, [visibleRecords, showUntracked, viewMode, selectedDate, tick]);
+        return groupByDay(visibleRecords, showUntracked, { mode: viewMode, date: selectedDate }, t, locale);
+    }, [visibleRecords, showUntracked, viewMode, selectedDate, tick, t, locale]);
 
     return (
         <div className="flex flex-col min-h-screen pt-4 pb-[168px]">
@@ -303,8 +318,8 @@ export default function RecordsScreen() {
                         <Clock size={36} className="text-emerald-500" />
                     </div>
                     <div>
-                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">No records found</p>
-                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Try selecting a different date</p>
+                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">{t('records.noRecords')}</p>
+                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">{t('records.trySelectingDate')}</p>
                     </div>
                 </div>
             ) : (
@@ -340,7 +355,7 @@ export default function RecordsScreen() {
                             onClick={() => setLimit(l => l + 50)}
                             className="w-full py-4 mt-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl font-bold text-sm transition-colors"
                         >
-                            Load More
+                            {t('common.loadMore')}
                         </button>
                     )}
                 </div>

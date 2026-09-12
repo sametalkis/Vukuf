@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { hexToHue } from '../utils/colors';
 import RunningTimerCard from '../components/RunningTimerCard';
@@ -8,6 +9,7 @@ import ActivityCard from '../components/ActivityCard';
 import AddActivityModal from '../components/AddActivityModal';
 
 export default function HomeScreen() {
+    const { t } = useTranslation();
     const { recordTypes, runningRecord, startTimer, showUntrackedTime } = useStore();
 
     const [showModal, setShowModal] = useState(false);
@@ -30,10 +32,10 @@ export default function HomeScreen() {
     const gridActivities = useMemo(() => {
         const sorted = [...recordTypes].sort((a, b) => hexToHue(a.color) - hexToHue(b.color));
         if (showUntrackedTime) {
-            return [...sorted, { id: 'untracked', name: 'Untracked Time', color: '#6b7280', icon: 'Clock' as any }];
+            return [...sorted, { id: 'untracked', name: t('timer.untrackedTitle'), color: '#6b7280', icon: 'Clock' as any }];
         }
         return sorted;
-    }, [recordTypes, showUntrackedTime]);
+    }, [recordTypes, showUntrackedTime, t]);
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -46,7 +48,7 @@ export default function HomeScreen() {
 
             {/* Top bar */}
             <div className="flex items-center gap-3 px-6 pt-4 pb-2 opacity-60">
-                <span className="text-xs font-bold uppercase tracking-widest text-gray-800 dark:text-gray-400">Activities</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-800 dark:text-gray-400">{t('timer.activities')}</span>
                 <div className="flex-1 h-px bg-gray-400 dark:bg-gray-700" />
             </div>
 
@@ -57,9 +59,9 @@ export default function HomeScreen() {
                         <Plus size={40} className="text-primary-500" />
                     </div>
                     <div>
-                        <p className="text-xl font-bold text-gray-800 dark:text-gray-200">No activities yet</p>
+                        <p className="text-xl font-bold text-gray-800 dark:text-gray-200">{t('timer.noActivities')}</p>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-[200px] mx-auto leading-relaxed">
-                            Tap the + button below to create your first tracking category.
+                            {t('timer.noActivitiesDesc')}
                         </p>
                     </div>
                 </div>
@@ -103,7 +105,8 @@ export default function HomeScreen() {
                             boxShadow: '0 8px 24px var(--primary-soft, rgba(255, 145, 0, 0.35))',
                         }}
                         className="absolute right-4 w-14 h-14 rounded-2xl shadow-xl flex items-center justify-center pointer-events-auto"
-                        aria-label="Aktivite ekle"
+                        aria-label={t('timer.addActivity')}
+                        title={t('timer.addActivity')}
                     >
                         <Plus size={28} />
                     </motion.button>

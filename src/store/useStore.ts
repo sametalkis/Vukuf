@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { RecordType, Record, RunningRecord } from '../types';
 import { DEFAULT_ACCENT_COLOR, applyAccentColor } from '../utils/accentColor';
 import { syncStorage } from '../sync/storage';
+import i18n, { getInitialLanguage } from '../locales/i18n';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function now() {
@@ -22,6 +23,7 @@ interface TimeTrackerStore {
     runningRecord: RunningRecord | null;
     showUntrackedTime: boolean;
     accentColor: string;
+    language: string;
 
     // Notification settings
     notificationsEnabled: boolean;
@@ -49,6 +51,7 @@ interface TimeTrackerStore {
     clearAllData: () => void;
 
     // Settings actions
+    setLanguage: (lang: string) => void;
     toggleUntrackedTime: () => void;
     setAccentColor: (color: string) => void;
     toggleNotifications: () => void;
@@ -66,10 +69,16 @@ export const useStore = create<TimeTrackerStore>()(
             runningRecord: null,
             showUntrackedTime: true,
             accentColor: DEFAULT_ACCENT_COLOR,
+            language: getInitialLanguage(),
             notificationsEnabled: false,
             notificationMinutes: 30,
             notificationRepeat: true,
             notificationSound: true,
+
+            setLanguage: (lang) => {
+                set({ language: lang });
+                i18n.changeLanguage(lang);
+            },
 
             // ── RecordType CRUD ──
             addRecordType: (data) => {
@@ -505,6 +514,9 @@ export const useStore = create<TimeTrackerStore>()(
             onRehydrateStorage: () => (state) => {
                 const color = state?.accentColor || DEFAULT_ACCENT_COLOR;
                 applyAccentColor(color);
+                if (state?.language) {
+                    i18n.changeLanguage(state.language);
+                }
             },
         }
     )

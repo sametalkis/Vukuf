@@ -1,26 +1,24 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
     Moon, Sun, Download, Upload, Trash2, AlertTriangle, Check, Clock,
     Palette, Bell, Repeat, Volume2, VolumeX, Send, Cloud, Database,
-    Info, HardDrive
+    Info, HardDrive, Languages, ChevronRight
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "../context/ThemeContext";
 import { useStore } from "../store/useStore";
 import { ACCENT_PRESETS } from "../utils/accentColor";
 import { checkNotificationPermission, requestNotificationPermission, sendActivityNotification } from "../utils/notifications";
 import SyncPanel from "../components/SyncPanel";
+import LanguageSelectorModal from "../components/LanguageSelectorModal";
+import { getLanguageByCode } from "../locales/languages";
 
 type SettingsTab = "appearance" | "timer" | "sync" | "data";
 
-const TABS: { id: SettingsTab; label: string; icon: typeof Palette }[] = [
-    { id: "appearance", label: "Görünüm", icon: Palette },
-    { id: "timer", label: "Zamanlayıcı", icon: Clock },
-    { id: "sync", label: "Bulut & AI", icon: Cloud },
-    { id: "data", label: "Veri", icon: Database },
-];
-
 export default function SettingsScreen() {
+    const { t, i18n } = useTranslation();
+    const isTr = i18n.language?.startsWith("tr");
     const { theme, toggleTheme } = useTheme();
     const {
         recordTypes, records, runningRecord,
@@ -31,12 +29,22 @@ export default function SettingsScreen() {
         notificationMinutes, setNotificationMinutes,
         notificationRepeat, toggleNotificationRepeat,
         notificationSound, toggleNotificationSound,
+        language, setLanguage,
     } = useStore();
 
+    const TABS: { id: SettingsTab; label: string; icon: typeof Palette }[] = useMemo(() => [
+        { id: "appearance", label: t("settings.tabs.appearance"), icon: Palette },
+        { id: "timer", label: t("settings.tabs.timer"), icon: Clock },
+        { id: "sync", label: t("settings.tabs.sync"), icon: Cloud },
+        { id: "data", label: t("settings.tabs.data"), icon: Database },
+    ], [t]);
+
     const [activeTab, setActiveTab] = useState<SettingsTab>("appearance");
+    const [showLanguageModal, setShowLanguageModal] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
     const [permissionStatus, setPermissionStatus] = useState(checkNotificationPermission());
+    const currentLangItem = useMemo(() => getLanguageByCode(language), [language]);
 
     const handleRequestPermission = async () => {
         const granted = await requestNotificationPermission();
@@ -51,17 +59,20 @@ export default function SettingsScreen() {
             const granted = await requestNotificationPermission();
             setPermissionStatus(checkNotificationPermission());
             if (!granted) {
-                alert("Bildirim izni verilmedi. Lütfen tarayıcı ayarlarından bildirimlere izin verin.");
+                alert(t("settings.timer.testAlertNoPermission"));
                 return;
             }
         }
         sendActivityNotification(
-            "⏰ Hâlâ \"Kodlama\" mı yapıyorsunuz?",
-            "\"Kodlama\" aktivitesi 45 dakikadır devam ediyor. Hâlâ bu aktiviteyi yapıyor musunuz?",
+            t("settings.timer.reminderTitle", { activity: isTr ? "Kodlama" : "Coding" }),
+            t("settings.timer.reminderBody", {
+                activity: isTr ? "Kodlama" : "Coding",
+                time: isTr ? "45 dakikadır" : "45 minutes"
+            }),
             notificationSound,
             [
-                { action: "stop", title: "⏹️ Hayır, Durdur" },
-                { action: "continue", title: "▶️ Evet, Devam Et" }
+                { action: "stop", title: t("settings.timer.reminderStop") },
+                { action: "continue", title: t("settings.timer.reminderContinue") }
             ]
         );
     };
@@ -102,12 +113,12 @@ export default function SettingsScreen() {
                     if (result.imported > 0 || result.activities > 0) {
                         setImportStatus({
                             type: "success",
-                            message: `✓ ${result.activities} aktivite, ${result.imported} kayıt içe aktarıldı`,
+                            message: t("settings.data.importSuccess", { activities: result.activities, records: result.imported }),
                         });
                     } else {
                         setImportStatus({
                             type: "error",
-                            message: ".backup dosyasında geçerli veri bulunamadı",
+                            message: t("settings.data.noDataInBackup"),
                         });
                     }
                 }
@@ -117,12 +128,12 @@ export default function SettingsScreen() {
                     if (result.imported > 0) {
                         setImportStatus({
                             type: "success",
-                            message: `✓ ${result.imported} kayıt içe aktarıldı${result.skipped > 0 ? `, ${result.skipped} atlandı` : ""}`,
+                            message: `${t("settings.data.importSuccessRecordsOnly", { records: result.imported })}${result.skipped > 0 ? `, ${t("settings.data.recordsSkipped", { count: result.skipped })}` : ""}`,
                         });
                     } else {
                         setImportStatus({
                             type: "error",
-                            message: "Format hatası: \"activity name\", \"time started\", \"time ended\" sütunları gerekli",
+                            message: t("settings.data.csvFormatError"),
                         });
                     }
                 }
@@ -133,12 +144,12 @@ export default function SettingsScreen() {
                         importData(text);
                         setImportStatus({
                             type: "success",
-                            message: `✓ ${parsed.records.length} kayıt, ${parsed.recordTypes.length} aktivite içe aktarıldı`,
+                            message: t("settings.data.importSuccess", { records: parsed.records.length, activities: parsed.recordTypes.length }),
                         });
                     } else {
                         setImportStatus({
                             type: "error",
-                            message: "Geçersiz JSON yedek formatı",
+                            message: t("settings.data.invalidJson"),
                         });
                     }
                 }
@@ -151,7 +162,7 @@ export default function SettingsScreen() {
                             importData(text);
                             setImportStatus({
                                 type: "success",
-                                message: `✓ ${parsed.records.length} kayıt, ${parsed.recordTypes.length} aktivite içe aktarıldı`,
+                                message: t("settings.data.importSuccess", { records: parsed.records.length, activities: parsed.recordTypes.length }),
                             });
                             handled = true;
                         }
@@ -162,7 +173,7 @@ export default function SettingsScreen() {
                         if (backupRes.imported > 0 || backupRes.activities > 0) {
                             setImportStatus({
                                 type: "success",
-                                message: `✓ ${backupRes.activities} aktivite, ${backupRes.imported} kayıt içe aktarıldı`,
+                                message: t("settings.data.importSuccess", { activities: backupRes.activities, records: backupRes.imported }),
                             });
                             handled = true;
                         }
@@ -173,7 +184,7 @@ export default function SettingsScreen() {
                         if (csvRes.imported > 0) {
                             setImportStatus({
                                 type: "success",
-                                message: `✓ ${csvRes.imported} kayıt içe aktarıldı`,
+                                message: t("settings.data.importSuccessRecordsOnly", { records: csvRes.imported }),
                             });
                             handled = true;
                         }
@@ -182,14 +193,14 @@ export default function SettingsScreen() {
                     if (!handled) {
                         setImportStatus({
                             type: "error",
-                            message: "Desteklenmeyen dosya formatı (.json, .csv, .backup desteklenir)",
+                            message: t("settings.data.importErrorFormat"),
                         });
                     }
                 }
             } catch {
                 setImportStatus({
                     type: "error",
-                    message: "Dosya okunurken veya ayrıştırılırken hata oluştu",
+                    message: t("settings.data.importErrorRead"),
                 });
             }
 
@@ -213,8 +224,8 @@ export default function SettingsScreen() {
             <div className="px-4 pt-10 pb-16 space-y-5 max-w-xl mx-auto">
                 {/* Header */}
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Ayarlar</h1>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Uygulama tercihleri ve senkronizasyon</p>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">{t("settings.title")}</h1>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("settings.subtitle")}</p>
                 </div>
 
                 {/* Segmented Horizontal Pill Tabs */}
@@ -264,6 +275,52 @@ export default function SettingsScreen() {
                             transition={{ duration: 0.18 }}
                             className="space-y-4"
                         >
+                            {/* 🌐 Dil Kartı (Impeccable Language Setting Row) */}
+                            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden transition-all">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowLanguageModal(true)}
+                                    className="w-full flex items-center justify-between gap-3 p-4 hover:bg-gray-50/80 dark:hover:bg-gray-800/50 active:bg-gray-100 dark:active:bg-gray-800 transition-colors text-left"
+                                    aria-haspopup="dialog"
+                                >
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        <div
+                                            className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors shadow-sm"
+                                            style={{
+                                                backgroundColor: "var(--primary-soft, rgba(255, 145, 0, 0.15))",
+                                                color: "var(--primary, #ff9100)"
+                                            }}
+                                        >
+                                            <Languages size={20} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                {t('settings.language.title')}
+                                            </p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                                                {t('settings.language.desc')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Current Selection Badge & Chevron */}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <div className="flex items-center gap-2 py-1.5 px-3 rounded-xl bg-gray-100 dark:bg-gray-800/90 border border-gray-200/80 dark:border-gray-700/60 shadow-xs">
+                                            <span className="text-sm leading-none">{currentLangItem.flag}</span>
+                                            <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                                                {currentLangItem.name}
+                                            </span>
+                                            <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-gray-200/70 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                                {currentLangItem.badge}
+                                            </span>
+                                        </div>
+                                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+                                            <ChevronRight size={16} />
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+
                             {/* Tema Kartı */}
                             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
                                 <button
@@ -275,10 +332,10 @@ export default function SettingsScreen() {
                                     </div>
                                     <div className="flex-1 text-left">
                                         <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {theme === "dark" ? "Koyu Tema" : "Açık Tema"}
+                                            {theme === "dark" ? t("settings.appearance.themeDark") : t("settings.appearance.themeLight")}
                                         </p>
                                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                            {theme === "dark" ? "Açık temaya geçmek için dokunun" : "Koyu temaya geçmek için dokunun"}
+                                            {theme === "dark" ? t("settings.appearance.switchToLight") : t("settings.appearance.switchToDark")}
                                         </p>
                                     </div>
                                     <div className={`relative w-12 h-6 rounded-full transition-colors duration-300 flex-shrink-0 ${theme === "dark" ? "bg-primary-600" : "bg-gray-300"}`}>
@@ -299,8 +356,8 @@ export default function SettingsScreen() {
                                             <Palette size={20} />
                                         </div>
                                         <div className="text-left">
-                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Vurgu Rengi</p>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Düğmeler, ikonlar ve aktif sayaç rengi</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.appearance.accentColor")}</p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("settings.appearance.accentDesc")}</p>
                                         </div>
                                     </div>
 
@@ -331,15 +388,15 @@ export default function SettingsScreen() {
                                             return (
                                                 <label
                                                     className={`accent-picker__custom-wrapper${isCustom ? " accent-picker__custom-wrapper--active" : ""}`}
-                                                    title="Özel Renk Seçici"
+                                                    title={t("settings.appearance.customColor")}
                                                     style={{ color: isCustom ? accentColor : "#a3a3a3" }}
                                                 >
                                                     <span
                                                         className="accent-picker__custom-swatch"
                                                         style={{
                                                             background: isCustom
-                                                                ? accentColor
-                                                                : "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)"
+                                                                 ? accentColor
+                                                                 : "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)"
                                                         }}
                                                     />
                                                     <input
@@ -360,13 +417,13 @@ export default function SettingsScreen() {
                                 <div className="px-4 py-3.5 flex items-center justify-between">
                                     <div className="flex items-center gap-2.5 text-gray-700 dark:text-gray-300 text-xs font-medium">
                                         <Info size={15} className="text-gray-400" />
-                                        <span>Uygulama Sürümü</span>
+                                        <span>{t("settings.data.version")}</span>
                                     </div>
                                     <span className="text-xs font-semibold font-mono text-gray-500 dark:text-gray-400">v1.0.0</span>
                                 </div>
                                 <div className="px-4 py-3.5 flex items-center justify-between">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">Vukuf</span>
-                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">PWA & E2EE Web App</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">{t("settings.data.appName")}</span>
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{t("settings.data.platform")}</span>
                                 </div>
                             </div>
                         </motion.div>
@@ -390,8 +447,8 @@ export default function SettingsScreen() {
                                             <Clock size={20} />
                                         </div>
                                         <div className="text-left">
-                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Boş Zamanları Göster</p>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">1 dakikadan uzun boşlukları takip edilmeyen süre göster</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.timer.untrackedTitle")}</p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("settings.timer.untrackedDesc")}</p>
                                         </div>
                                     </div>
                                     <button
@@ -412,12 +469,12 @@ export default function SettingsScreen() {
                                             <Bell size={20} className="text-amber-500 flex-shrink-0" />
                                             <div>
                                                 <p className="text-xs font-semibold text-amber-900 dark:text-amber-300">
-                                                    {permissionStatus === "denied" ? "Bildirim İzni Engellenmiş" : "Bildirim İzni Gerekli"}
+                                                    {permissionStatus === "denied" ? t("settings.timer.permDenied") : t("settings.timer.permRequired")}
                                                 </p>
                                                 <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80 mt-0.5">
                                                     {permissionStatus === "denied"
-                                                        ? "Aktivite uyarıları için tarayıcı site ayarlarından bildirimlere izin verin."
-                                                        : "Aktivite uyarılarını alabilmek için tarayıcı bildirimi izni verin."}
+                                                        ? t("settings.timer.permDeniedDesc")
+                                                        : t("settings.timer.permRequiredDesc")}
                                                 </p>
                                             </div>
                                         </div>
@@ -427,7 +484,7 @@ export default function SettingsScreen() {
                                                 className="px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-sm flex-shrink-0"
                                                 style={{ backgroundColor: "var(--primary, #ff9100)", color: "var(--primary-contrast, #ffffff)" }}
                                             >
-                                                İzin Ver
+                                                {t("settings.timer.grantPermission")}
                                             </button>
                                         )}
                                     </div>
@@ -446,8 +503,8 @@ export default function SettingsScreen() {
                                             <Bell size={20} />
                                         </div>
                                         <div className="text-left">
-                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Aktivite Kontrol Bildirimi</p>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Hâlâ bu aktiviteyi yapıp yapmadığınızı sorar</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.timer.notificationsTitle")}</p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("settings.timer.notificationsDesc")}</p>
                                         </div>
                                     </div>
                                     <button
@@ -464,12 +521,14 @@ export default function SettingsScreen() {
                                     <>
                                         <div className="px-4 py-4 space-y-2.5">
                                             <div className="flex items-center justify-between">
-                                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Kontrol Süresi</p>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.timer.checkInterval")}</p>
                                                 <span
                                                     className="text-xs font-bold px-2 py-0.5 rounded-md"
                                                     style={{ backgroundColor: "var(--primary-soft, rgba(255, 145, 0, 0.15))", color: "var(--primary, #ff9100)" }}
                                                 >
-                                                    {notificationMinutes < 60 ? `${notificationMinutes} dakika` : `${notificationMinutes / 60} saat`}
+                                                    {notificationMinutes < 60
+                                                        ? t("settings.timer.minutes", { count: notificationMinutes })
+                                                        : t("settings.timer.hours", { count: notificationMinutes / 60 })}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -490,7 +549,9 @@ export default function SettingsScreen() {
                                                                 color: "var(--primary-contrast, #ffffff)"
                                                             } : undefined}
                                                         >
-                                                            {mins < 60 ? `${mins} dk` : `${mins / 60} sa`}
+                                                            {mins < 60
+                                                                ? t("settings.timer.minsShort", { count: mins })
+                                                                : t("settings.timer.hoursShort", { count: mins / 60 })}
                                                         </button>
                                                     );
                                                 })}
@@ -504,8 +565,8 @@ export default function SettingsScreen() {
                                                     <Repeat size={18} />
                                                 </div>
                                                 <div className="text-left">
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Periyodik Tekrarla</p>
-                                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Durdurulana kadar her {notificationMinutes} dakikada bir tekrar sor</p>
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.timer.repeatTitle")}</p>
+                                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("settings.timer.repeatDesc", { mins: notificationMinutes })}</p>
                                                 </div>
                                             </div>
                                             <button
@@ -524,8 +585,8 @@ export default function SettingsScreen() {
                                                     {notificationSound ? <Volume2 size={18} /> : <VolumeX size={18} />}
                                                 </div>
                                                 <div className="text-left">
-                                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Sesli Uyarı</p>
-                                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Bildirim geldiğinde nazik melodi çal</p>
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.timer.soundTitle")}</p>
+                                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t("settings.timer.soundDesc")}</p>
                                                 </div>
                                             </div>
                                             <button
@@ -544,7 +605,7 @@ export default function SettingsScreen() {
                                                 onClick={handleTestNotification}
                                                 className="w-full py-2.5 px-4 rounded-xl border border-gray-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors flex items-center justify-center gap-2"
                                             >
-                                                <Send size={14} /> Test Bildirimi Gönder
+                                                <Send size={14} /> {t("settings.timer.testButton")}
                                             </button>
                                         </div>
                                     </>
@@ -584,9 +645,9 @@ export default function SettingsScreen() {
                                         <HardDrive size={20} />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Yerel Veri Tabanı</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.data.localDatabase")}</p>
                                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                            Cihazınızda {records.length} kayıt, {recordTypes.length} aktivite saklanıyor
+                                            {t("settings.data.storageInfo", { records: records.length, activities: recordTypes.length })}
                                         </p>
                                     </div>
                                 </div>
@@ -606,9 +667,9 @@ export default function SettingsScreen() {
                                         <Download size={18} className="text-emerald-600 dark:text-emerald-400" />
                                     </div>
                                     <div className="flex-1 text-left">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Verileri Dışa Aktar</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.data.exportTitle")}</p>
                                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                            Tüm kayıtları JSON dosyası olarak cihazınıza indirin
+                                            {t("settings.data.exportDesc")}
                                         </p>
                                     </div>
                                 </button>
@@ -634,7 +695,7 @@ export default function SettingsScreen() {
                                         )}
                                     </div>
                                     <div className="flex-1 text-left">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Verileri İçe Aktar</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t("settings.data.importTitle")}</p>
                                         <p className="text-xs mt-0.5">
                                             {importStatus.type === "success" ? (
                                                 <span className="text-emerald-500 font-medium">{importStatus.message}</span>
@@ -642,7 +703,7 @@ export default function SettingsScreen() {
                                                 <span className="text-red-500 font-medium">{importStatus.message}</span>
                                             ) : (
                                                 <span className="text-gray-400 dark:text-gray-500">
-                                                    JSON, CSV veya .backup yedek dosyasından geri yükleyin
+                                                    {t("settings.data.importDesc")}
                                                 </span>
                                             )}
                                         </p>
@@ -667,9 +728,9 @@ export default function SettingsScreen() {
                                         <Trash2 size={18} className="text-red-600 dark:text-red-400" />
                                     </div>
                                     <div className="flex-1 text-left">
-                                        <p className="text-sm font-medium text-red-600 dark:text-red-400">Tüm Verileri Sıfırla</p>
+                                        <p className="text-sm font-medium text-red-600 dark:text-red-400">{t("settings.data.clearTitle")}</p>
                                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                            Bu cihazdaki tüm aktiviteleri ve geçmiş zaman kayıtlarını kalıcı olarak sil
+                                            {t("settings.data.clearDesc")}
                                         </p>
                                     </div>
                                 </button>
@@ -701,9 +762,12 @@ export default function SettingsScreen() {
                                 <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                                     <Trash2 size={28} className="text-red-600 dark:text-red-400" />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-50">Tüm Veriler Silinsin mi?</h3>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-50">{t("settings.data.clearConfirmTitle")}</h3>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    Bu işlem cihazınızdaki <strong>{recordTypes.length}</strong> aktiviteyi ve <strong>{records.length}</strong> zaman kaydını kalıcı olarak silecektir. Bu işlem geri alınamaz.
+                                    {t("settings.data.clearConfirmDesc", {
+                                        activities: recordTypes.length,
+                                        records: records.length
+                                    })}
                                 </p>
                             </div>
                             <div className="flex gap-3">
@@ -711,19 +775,27 @@ export default function SettingsScreen() {
                                     onClick={() => setShowClearConfirm(false)}
                                     className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                                 >
-                                    Vazgeç
+                                    {t("settings.data.cancel")}
                                 </button>
                                 <button
                                     onClick={handleClear}
                                     className="flex-1 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
                                 >
-                                    Tümünü Sil
+                                    {t("settings.data.confirmClearButton")}
                                 </button>
                             </div>
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Impeccable Language Selector Modal */}
+            <LanguageSelectorModal
+                isOpen={showLanguageModal}
+                onClose={() => setShowLanguageModal(false)}
+                currentLanguage={language}
+                onSelectLanguage={(code) => setLanguage(code)}
+            />
         </>
     );
 }

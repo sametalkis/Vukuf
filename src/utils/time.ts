@@ -1,14 +1,22 @@
 // Shared time formatting utilities
+import i18n from '../locales/i18n';
 
-export function formatDuration(seconds: number): string {
-    if (seconds < 60) return `${seconds}s`;
+export function formatDuration(seconds: number, lang?: string): string {
+    const activeLang = lang || (typeof i18n !== 'undefined' && i18n?.language ? i18n.language : 'tr');
+    const isTr = activeLang.startsWith('tr');
+
+    const sSuffix = isTr ? 'sn' : 's';
+    const mSuffix = isTr ? 'dk' : 'm';
+    const hSuffix = isTr ? 'sa' : 'h';
+
+    if (seconds < 60) return `${seconds}${sSuffix}`;
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    if (s > 0 && m < 10) return `${m}m ${s}s`;
-    return `${m}m`;
+    if (h > 0 && m > 0) return `${h}${hSuffix} ${m}${mSuffix}`;
+    if (h > 0) return `${h}${hSuffix}`;
+    if (s > 0 && m < 10) return `${m}${mSuffix} ${s}${sSuffix}`;
+    return `${m}${mSuffix}`;
 }
 
 /**

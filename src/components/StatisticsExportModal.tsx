@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, Check, Copy, Download, Loader2, RefreshCw, Share2, X } from 'lucide-react';
 import { getFontEmbedCSS, toBlob } from 'html-to-image';
+import { useTranslation } from 'react-i18next';
 import type { ViewMode } from './DateSelectorBar';
 import { formatDuration } from '../utils/time';
 
@@ -27,10 +28,10 @@ function getSafePixelRatio(width: number, height: number): number {
     );
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMsg: string): Promise<T> {
     return new Promise((resolve, reject) => {
         const timeoutId = window.setTimeout(
-            () => reject(new Error('Görsel oluşturma zaman aşımına uğradı.')),
+            () => reject(new Error(timeoutMsg)),
             timeoutMs,
         );
 
@@ -49,7 +50,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 
 function createFileSlug(value: string): string {
     return value
-        .toLocaleLowerCase('tr-TR')
+        .toLocaleLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/ı/g, 'i')
@@ -79,6 +80,10 @@ export default function StatisticsExportModal({
     totalDuration,
     sourceElement,
 }: StatisticsExportModalProps) {
+    const { t, i18n } = useTranslation();
+    const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-US';
+    const isTr = i18n.language?.startsWith('tr');
+
     const [isGenerating, setIsGenerating] = useState(true);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [imageBlob, setImageBlob] = useState<Blob | null>(null);
@@ -93,27 +98,27 @@ export default function StatisticsExportModal({
     const periodTitle = useMemo(() => {
         if (viewMode === 'day') {
             const today = new Date();
-            if (selectedDate.toDateString() === today.toDateString()) return 'Bugün';
-            return selectedDate.toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+            if (selectedDate.toDateString() === today.toDateString()) return t('time.today');
+            return selectedDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
         }
         if (viewMode === 'month') {
-            return selectedDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+            return selectedDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
         }
         if (viewMode === 'year') {
-            return `${selectedDate.getFullYear()} Yılı`;
+            return isTr ? `${selectedDate.getFullYear()} Yılı` : `${selectedDate.getFullYear()}`;
         }
-        return 'Tüm Zamanlar';
-    }, [viewMode, selectedDate]);
+        return t('dateSelector.allHistory');
+    }, [viewMode, selectedDate, locale, isTr, t]);
 
     const periodBadge = useMemo(() => {
-        if (viewMode === 'day') return 'Günlük';
-        if (viewMode === 'month') return 'Aylık';
-        if (viewMode === 'year') return 'Yıllık';
-        return 'Genel';
-    }, [viewMode]);
+        if (viewMode === 'day') return t('dateSelector.day');
+        if (viewMode === 'month') return t('dateSelector.month');
+        if (viewMode === 'year') return t('dateSelector.year');
+        return t('dateSelector.all');
+    }, [viewMode, t]);
 
     const generateImage = useCallback(async () => {
-        if (!sourceElement.isConnected) throw new Error('İstatistik görünümü artık ekranda değil.');
+        if (!sourceElement.isConnected) throw new Error(t('export.disconnected'));
 
         // Freeze the real page before any async work. Only this detached copy
         // receives export spacing and text wrapping; the live timer keeps running.
@@ -121,7 +126,7 @@ export default function StatisticsExportModal({
         const backgroundColor = getEffectiveBackgroundColor(sourceElement, isDark ? '#030712' : '#f3f4f6');
         const sourceStyle = getComputedStyle(sourceElement);
         const width = Math.ceil(sourceElement.getBoundingClientRect().width);
-        if (width <= 0) throw new Error('Dışa aktarma görünümü ölçülemedi.');
+        if (width <= 0) throw new Error(t('export.unmeasurable'));
 
         Object.assign(node.style, {
             width: `${width}px`,
@@ -160,7 +165,7 @@ export default function StatisticsExportModal({
             try {
                 // Loaded web fonts are not automatically available inside the SVG
                 // image. Embed them so text keeps its original metrics in PNG.
-                fontEmbedCSS = await withTimeout(getFontEmbedCSS(node, { preferredFontFormat: 'woff2' }), 4000);
+                fontEmbedCSS = await withTimeout(getFontEmbedCSS(node, { preferredFontFormat: 'woff2' }), 4000, t('export.timeout'));
             } catch {
                 // Offline export remains available using the system font below.
             }
@@ -168,7 +173,7 @@ export default function StatisticsExportModal({
                 node.style.fontFamily = 'system-ui, -apple-system, sans-serif';
             }
             if ('fonts' in document) {
-                await withTimeout(document.fonts.ready, 3000).catch(() => undefined);
+                await withTimeout(document.fonts.ready, 3000, t('export.timeout')).catch(() => undefined);
             }
 
             const height = Math.ceil(node.getBoundingClientRect().height);
@@ -182,13 +187,14 @@ export default function StatisticsExportModal({
                     height,
                 }),
                 15_000,
+                t('export.timeout'),
             );
-            if (!blob) throw new Error('Tarayıcı PNG verisi oluşturamadı.');
+            if (!blob) throw new Error(t('export.blobError'));
             return blob;
         } finally {
             host.remove();
         }
-    }, [isDark, sourceElement]);
+    }, [isDark, sourceElement, t]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -209,7 +215,7 @@ export default function StatisticsExportModal({
             .catch((error: unknown) => {
                 if (!isMounted) return;
                 console.error('Failed to generate statistics image:', error);
-                setGenerationError(error instanceof Error ? error.message : 'Görsel oluşturulamadı.');
+                setGenerationError(error instanceof Error ? error.message : t('export.failed'));
             })
             .finally(() => {
                 if (isMounted) setIsGenerating(false);
@@ -218,7 +224,7 @@ export default function StatisticsExportModal({
         return () => {
             isMounted = false;
         };
-    }, [generateImage, generationAttempt, isOpen]);
+    }, [generateImage, generationAttempt, isOpen, t]);
 
     useEffect(() => () => {
         if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -240,7 +246,7 @@ export default function StatisticsExportModal({
     const handleDownload = () => {
         if (!imageUrl) return;
         const link = document.createElement('a');
-        const fileNameSafe = createFileSlug(periodTitle) || 'istatistik';
+        const fileNameSafe = createFileSlug(periodTitle) || (isTr ? 'istatistik' : 'statistics');
         link.download = `vukuf-${fileNameSafe}-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = imageUrl;
         document.body.appendChild(link);
@@ -252,14 +258,14 @@ export default function StatisticsExportModal({
     const handleShare = async () => {
         if (!imageBlob) return;
         try {
-            const file = new File([imageBlob], `istatistik-${createFileSlug(periodTitle) || 'ozet'}.png`, {
+            const file = new File([imageBlob], `${createFileSlug(periodTitle) || (isTr ? 'istatistik' : 'statistics')}.png`, {
                 type: 'image/png',
             });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     title: `Vukuf - ${periodTitle}`,
-                    text: `${periodTitle} zaman takibi istatistikleri: Toplam ${formatDuration(totalDuration)}`,
+                    text: t('export.shareText', { period: periodTitle, total: formatDuration(totalDuration) }),
                     files: [file],
                 });
             } else {
@@ -324,10 +330,10 @@ export default function StatisticsExportModal({
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                    İstatistik Sayfası Görüntüsü
+                                    {t('export.title')}
                                 </h3>
                                 <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                                    {periodTitle} • {periodBadge} Özet
+                                    {t('export.summary', { period: periodTitle, badge: periodBadge })}
                                 </p>
                             </div>
                         </div>
@@ -335,7 +341,7 @@ export default function StatisticsExportModal({
                         <button
                             type="button"
                             onClick={onClose}
-                            aria-label="Dışa aktarma penceresini kapat"
+                            aria-label={t('export.close')}
                             className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
                         >
                             <X size={18} />
@@ -349,10 +355,10 @@ export default function StatisticsExportModal({
                                 <Loader2 size={30} className="animate-spin" style={{ color: 'var(--primary, #ff9100)' }} />
                                 <div>
                                     <p className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                                        Sayfa Görüntüsü Hazırlanıyor...
+                                        {t('export.preparingTitle')}
                                     </p>
                                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                        İstatistik dairesi ve aktiviteler render ediliyor
+                                        {t('export.preparingDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -361,22 +367,22 @@ export default function StatisticsExportModal({
                                 <div className="rounded-2xl overflow-hidden shadow-xl border border-gray-200/80 dark:border-neutral-800 max-h-[52dvh] overflow-y-auto w-full bg-white dark:bg-neutral-900">
                                     <img
                                         src={imageUrl}
-                                        alt="İstatistik Sayfası"
+                                        alt={t('export.title')}
                                         className="w-full h-auto block select-none"
                                     />
                                 </div>
                                 <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">
-                                    💡 İpucu: Mobilde görselin üzerine basılı tutarak doğrudan galerinize kaydedebilirsiniz.
+                                    {t('export.mobileHint')}
                                 </p>
                             </div>
                         ) : generationError ? (
                             <div className="flex flex-col items-center text-center py-10 max-w-xs">
                                 <AlertCircle size={28} className="text-red-500 mb-3" />
                                 <p className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                                    Görsel oluşturulamadı
+                                    {t('export.failed')}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-4">
-                                    {generationError} Tekrar deneyebilir veya pencereyi kapatıp yeniden açabilirsiniz.
+                                    {t('export.retryHint', { error: generationError })}
                                 </p>
                                 <button
                                     type="button"
@@ -385,11 +391,11 @@ export default function StatisticsExportModal({
                                     style={{ backgroundColor: 'var(--primary, #ff9100)' }}
                                 >
                                     <RefreshCw size={15} />
-                                    Tekrar Dene
+                                    {t('export.retry')}
                                 </button>
                             </div>
                         ) : (
-                            <div className="text-sm text-gray-500 dark:text-gray-400 py-10">Önizleme hazır değil.</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 py-10">{t('export.notReady')}</div>
                         )}
                     </div>
 
@@ -406,7 +412,7 @@ export default function StatisticsExportModal({
                             }}
                         >
                             <Download size={16} />
-                            <span>Görseli İndir (PNG)</span>
+                            <span>{t('export.downloadImage')}</span>
                         </button>
 
                         <button
@@ -416,7 +422,7 @@ export default function StatisticsExportModal({
                             className="py-3 px-4 rounded-2xl font-bold text-sm bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-750 text-gray-700 dark:text-gray-200 border border-gray-200/60 dark:border-neutral-700/60 transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             <Share2 size={16} />
-                            <span className="hidden sm:inline">Paylaş</span>
+                            <span className="hidden sm:inline">{t('export.share')}</span>
                         </button>
 
                         <button
@@ -424,7 +430,7 @@ export default function StatisticsExportModal({
                             onClick={handleCopyImage}
                             disabled={isGenerating || !imageBlob}
                             className="py-3 px-3 rounded-2xl font-bold text-sm bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-750 text-gray-700 dark:text-gray-200 border border-gray-200/60 dark:border-neutral-700/60 transition-all duration-200 active:scale-[0.98] flex items-center justify-center disabled:opacity-50"
-                            title="Panoya Kopyala"
+                            title={t('export.copyImage')}
                         >
                             {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
                         </button>

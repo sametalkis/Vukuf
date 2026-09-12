@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { sendActivityNotification } from '../utils/notifications';
 
 export function useActivityReminder() {
+    const { t, i18n } = useTranslation();
     const runningRecord = useStore((s) => s.runningRecord);
     const recordTypes = useStore((s) => s.recordTypes);
     const notificationsEnabled = useStore((s) => s.notificationsEnabled);
@@ -47,21 +49,22 @@ export function useActivityReminder() {
                 lastNotifiedThresholdRef.current = currentMultiple;
 
                 const activity = recordTypes.find((rt) => rt.id === runningRecord.recordTypeId);
-                const activityName = activity?.name || 'Aktivite';
+                const activityName = activity?.name || t('common.activity');
 
                 const hours = Math.floor(elapsedMinutes / 60);
                 const mins = elapsedMinutes % 60;
                 let timeStr = '';
+                const isTr = i18n.language.startsWith('tr');
                 if (hours > 0 && mins > 0) {
-                    timeStr = `${hours} sa ${mins} dk`;
+                    timeStr = isTr ? `${hours} sa ${mins} dk` : `${hours}h ${mins}m`;
                 } else if (hours > 0) {
-                    timeStr = `${hours} saat`;
+                    timeStr = isTr ? `${hours} saat` : `${hours} hour${hours > 1 ? 's' : ''}`;
                 } else {
-                    timeStr = `${mins} dakika`;
+                    timeStr = isTr ? `${mins} dakika` : `${mins} minute${mins > 1 ? 's' : ''}`;
                 }
 
-                const title = `⏰ Hâlâ "${activityName}" mi yapıyorsunuz?`;
-                const body = `"${activityName}" aktivitesi ${timeStr}'dir devam ediyor. Hâlâ bu aktiviteyi yapıyor musunuz?`;
+                const title = t('settings.timer.reminderTitle', { activity: activityName });
+                const body = t('settings.timer.reminderBody', { activity: activityName, time: timeStr });
 
                 // Dispatch Web Notification only
                 sendActivityNotification(
@@ -69,8 +72,8 @@ export function useActivityReminder() {
                     body,
                     notificationSound,
                     [
-                        { action: 'stop', title: '⏹️ Hayır, Durdur' },
-                        { action: 'continue', title: '▶️ Evet, Devam Et' }
+                        { action: 'stop', title: t('settings.timer.reminderStop') },
+                        { action: 'continue', title: t('settings.timer.reminderContinue') }
                     ]
                 );
             }
@@ -87,6 +90,8 @@ export function useActivityReminder() {
         notificationsEnabled,
         notificationMinutes,
         notificationRepeat,
-        notificationSound
+        notificationSound,
+        t,
+        i18n.language
     ]);
 }

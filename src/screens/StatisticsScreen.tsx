@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { formatDuration, formatPercent, splitRecordByDays } from '../utils/time';
 import DateSelectorBar from '../components/DateSelectorBar';
@@ -58,6 +59,8 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 }
 
 export default function StatisticsScreen() {
+    const { t, i18n } = useTranslation();
+    const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-US';
     const syncStatus = useSyncStatus();
     const { records, recordTypes, runningRecord } = useStore();
 
@@ -83,17 +86,17 @@ export default function StatisticsScreen() {
     const periodSubtitle = useMemo(() => {
         if (viewMode === 'day') {
             const today = new Date();
-            if (selectedDate.toDateString() === today.toDateString()) return 'Bugün';
-            return selectedDate.toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short' });
+            if (selectedDate.toDateString() === today.toDateString()) return t('common.today');
+            return selectedDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
         }
         if (viewMode === 'month') {
-            return selectedDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+            return selectedDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
         }
         if (viewMode === 'year') {
             return `${selectedDate.getFullYear()}`;
         }
-        return 'Tüm Zamanlar';
-    }, [viewMode, selectedDate]);
+        return t('common.allTime');
+    }, [viewMode, selectedDate, locale, t]);
 
     const handleOpenDetail = (item: {
         id: string;
@@ -166,13 +169,16 @@ export default function StatisticsScreen() {
             countByType[r.recordTypeId] = (countByType[r.recordTypeId] ?? 0) + 1;
         }
 
-        const extendedTypes = [...recordTypes, { id: 'untracked', name: 'Untracked Time', color: '#6b7280', icon: 'Clock' }];
+        const extendedTypes = [
+            ...recordTypes,
+            { id: 'untracked', name: t('timer.untrackedTitle'), color: '#6b7280', icon: 'Clock' },
+        ];
 
         return extendedTypes
             .filter((rt) => byType[rt.id] !== undefined)
             .map((rt) => ({
                 id: rt.id,
-                name: rt.name,
+                name: rt.id === 'untracked' ? t('timer.untrackedTitle') : rt.name,
                 color: rt.color,
                 icon: rt.icon,
                 duration: byType[rt.id],
@@ -180,7 +186,7 @@ export default function StatisticsScreen() {
                 percent: totalAll > 0 ? (byType[rt.id] / totalAll) * 100 : 0,
             }))
             .sort((a, b) => b.duration - a.duration);
-    }, [filteredRecords, recordTypes]);
+    }, [filteredRecords, recordTypes, t]);
 
     const totalDuration = stats.reduce((s, a) => s + a.duration, 0);
 
@@ -190,6 +196,7 @@ export default function StatisticsScreen() {
         return stats.find((s) => s.id === activeModalActivity.id) || activeModalActivity;
     }, [stats, activeModalActivity]);
 
+    // Records for the selected activity
     const selectedActivityRecords = useMemo(() => {
         if (!activeDetailActivity) return [];
         return filteredRecords.filter((r) => r.recordTypeId === activeDetailActivity.id);
@@ -197,15 +204,19 @@ export default function StatisticsScreen() {
 
     return (
         <div className="flex flex-col min-h-screen pt-4 pb-[168px]">
-            {(syncStatus.conflicts.length > 0 || syncStatus.activeSessions.length > 1) && <p className="mx-4 mb-3 text-sm text-amber-700 dark:text-amber-300">Eşitlemede incelenmesi gereken kayıtlar var. Toplamlar henüz kesinleşmemiş olabilir. Ayarlar → Cihazlar ve Eşitleme bölümünü inceleyin.</p>}
+            {(syncStatus.conflicts.length > 0 || syncStatus.activeSessions.length > 1) && (
+                <p className="mx-4 mb-3 text-sm text-amber-700 dark:text-amber-300">
+                    {t('statistics.syncWarning')}
+                </p>
+            )}
             {stats.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
                     <div className="w-20 h-20 rounded-3xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
                         <span className="text-4xl">📊</span>
                     </div>
                     <div>
-                        <p className="text-base font-semibold text-gray-700 dark:text-gray-300">No data found</p>
-                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Try selecting a different date range</p>
+                        <p className="text-base font-semibold text-gray-700 dark:text-gray-300">{t('statistics.noData')}</p>
+                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">{t('statistics.trySelectingRange')}</p>
                     </div>
                 </div>
             ) : (
@@ -214,7 +225,7 @@ export default function StatisticsScreen() {
                     <div className="flex items-center justify-between pt-1 pb-1 mb-2 px-1">
                         <div>
                             <h1 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
-                                İstatistikler
+                                {t('statistics.title')}
                             </h1>
                             <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 mt-0.5">
                                 {periodSubtitle}
@@ -234,8 +245,8 @@ export default function StatisticsScreen() {
                                 });
                             }}
                             className="w-10 h-10 rounded-2xl bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-200 border border-gray-200/80 dark:border-neutral-800 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
-                            title="Paylaş"
-                            aria-label="Paylaş"
+                            title={t('common.share')}
+                            aria-label={t('common.share')}
                         >
                             <Share2 size={18} style={{ color: 'var(--primary, #ff9100)' }} />
                         </button>
@@ -281,15 +292,19 @@ export default function StatisticsScreen() {
                             <span className="text-2xl font-bold text-gray-800 dark:text-gray-200">
                                 {formatDuration(totalDuration)}
                             </span>
-                            <span className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">total</span>
+                            <span className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">
+                                {t('statistics.total')}
+                            </span>
                         </div>
                     </div>
 
                     {/* Section Header */}
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Activities</span>
+                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{t('statistics.activities')}</span>
                         <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
-                            {stats.length} {stats.length === 1 ? 'activity' : 'activities'}
+                            {stats.length === 1
+                                ? t('statistics.activityCount_one', { count: 1 })
+                                : t('statistics.activityCount_other', { count: stats.length })}
                         </span>
                     </div>
 
@@ -303,7 +318,11 @@ export default function StatisticsScreen() {
                                 color={item.color}
                                 subtitleLeft={formatPercent(item.percent)}
                                 titleRight={formatDuration(item.duration)}
-                                subtitleRight={`${item.sessionCount} ${item.sessionCount === 1 ? 'session' : 'sessions'}`}
+                                subtitleRight={
+                                    item.sessionCount === 1
+                                        ? t('statistics.sessionCount_one', { count: 1 })
+                                        : t('statistics.sessionCount_other', { count: item.sessionCount })
+                                }
                                 onClick={() => handleOpenDetail(item)}
                                 showChevron={true}
                                 className="cursor-pointer active:scale-[0.98] transition-transform"
