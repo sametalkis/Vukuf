@@ -1,12 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "simple-time-tracker",
+  "name": "timetracker",
   "compatibility_date": "2026-09-11",
-  "observability": {
-    "enabled": true
-  },
-  "assets": {
-    "not_found_handling": "single-page-application"
-  },
   "pages_build_output_dir": "dist"
 }
