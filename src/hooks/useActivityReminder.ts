@@ -9,8 +9,6 @@ export function useActivityReminder() {
     const notificationMinutes = useStore((s) => s.notificationMinutes);
     const notificationRepeat = useStore((s) => s.notificationRepeat);
     const notificationSound = useStore((s) => s.notificationSound);
-    const setActiveInquiry = useStore((s) => s.setActiveInquiry);
-    const dismissInquiry = useStore((s) => s.dismissInquiry);
 
     const lastSessionIdRef = useRef<string | null>(null);
     const lastNotifiedThresholdRef = useRef<number>(0);
@@ -19,7 +17,6 @@ export function useActivityReminder() {
         if (!notificationsEnabled || !runningRecord || runningRecord.recordTypeId === 'untracked') {
             lastSessionIdRef.current = null;
             lastNotifiedThresholdRef.current = 0;
-            dismissInquiry();
             return;
         }
 
@@ -27,7 +24,6 @@ export function useActivityReminder() {
         if (lastSessionIdRef.current !== runningRecord.id) {
             lastSessionIdRef.current = runningRecord.id;
             lastNotifiedThresholdRef.current = 0;
-            dismissInquiry();
         }
 
         const checkReminder = () => {
@@ -67,7 +63,7 @@ export function useActivityReminder() {
                 const title = `⏰ Hâlâ "${activityName}" mi yapıyorsunuz?`;
                 const body = `"${activityName}" aktivitesi ${timeStr}'dir devam ediyor. Hâlâ bu aktiviteyi yapıyor musunuz?`;
 
-                // 1. Dispatch Web Notification
+                // Dispatch Web Notification only
                 sendActivityNotification(
                     title,
                     body,
@@ -77,17 +73,6 @@ export function useActivityReminder() {
                         { action: 'continue', title: '▶️ Evet, Devam Et' }
                     ]
                 );
-
-                // 2. Trigger In-App Interactive Confirmation Dialog
-                setActiveInquiry({
-                    recordTypeId: runningRecord.recordTypeId,
-                    activityName,
-                    activityColor: activity?.color,
-                    activityIcon: activity?.icon,
-                    elapsedMinutes,
-                    timeStr,
-                    promptedAt: new Date().toISOString()
-                });
             }
         };
 
@@ -102,8 +87,6 @@ export function useActivityReminder() {
         notificationsEnabled,
         notificationMinutes,
         notificationRepeat,
-        notificationSound,
-        setActiveInquiry,
-        dismissInquiry
+        notificationSound
     ]);
 }

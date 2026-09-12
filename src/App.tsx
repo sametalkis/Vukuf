@@ -14,7 +14,6 @@ import RecordsScreen from './screens/RecordsScreen';
 import StatisticsScreen from './screens/StatisticsScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { useActivityReminder } from './hooks/useActivityReminder';
-import ActivityInquiryModal from './components/ActivityInquiryModal';
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -70,7 +69,6 @@ function App() {
             <AnimatedRoutes />
           </Layout>
           <BottomNav />
-          <ActivityInquiryModal />
         </div>
       </div>
     </ThemeProvider>

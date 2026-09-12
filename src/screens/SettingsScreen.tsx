@@ -17,7 +17,6 @@ export default function SettingsScreen() {
         notificationMinutes, setNotificationMinutes,
         notificationRepeat, toggleNotificationRepeat,
         notificationSound, toggleNotificationSound,
-        setActiveInquiry
     } = useStore();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,16 +36,7 @@ export default function SettingsScreen() {
             const granted = await requestNotificationPermission();
             setPermissionStatus(checkNotificationPermission());
             if (!granted) {
-                // If web notification permission not granted, show in-app inquiry test
-                setActiveInquiry({
-                    recordTypeId: 'test',
-                    activityName: 'Kodlama',
-                    activityColor: accentColor || '#ff9100',
-                    activityIcon: 'Code',
-                    elapsedMinutes: 45,
-                    timeStr: '45 dakika',
-                    promptedAt: new Date().toISOString()
-                });
+                alert('Bildirim izni verilmedi. Lütfen tarayıcı ayarlarından bildirimlere izin verin.');
                 return;
             }
         }
@@ -59,15 +49,6 @@ export default function SettingsScreen() {
                 { action: 'continue', title: '▶️ Evet, Devam Et' }
             ]
         );
-        setActiveInquiry({
-            recordTypeId: 'test',
-            activityName: 'Kodlama',
-            activityColor: accentColor || '#ff9100',
-            activityIcon: 'code',
-            elapsedMinutes: 45,
-            timeStr: '45 dakika',
-            promptedAt: new Date().toISOString()
-        });
     };
 
     const [importStatus, setImportStatus] = useState<{
