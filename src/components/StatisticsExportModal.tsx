@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Share2, X, Loader2, Check, Sparkles, Clock } from 'lucide-react';
+import { Download, Share2, X, Loader2, Check, Clock } from 'lucide-react';
 import { toPng, toBlob } from 'html-to-image';
+import { PieChart, Pie, Cell } from 'recharts';
 import type { Record as TimeRecord, RecordType, RunningRecord } from '../types';
 import type { ViewMode } from './DateSelectorBar';
-import { formatDuration, splitRecordByDays } from '../utils/time';
+import { formatDuration } from '../utils/time';
 import DynamicIcon from './DynamicIcon';
-import ActivityHeatmap from './ActivityHeatmap';
 
 interface StatisticsExportModalProps {
     isOpen: boolean;
@@ -29,6 +29,23 @@ interface StatisticsExportModalProps {
     runningRecord: RunningRecord | null;
 }
 
+const RADIAN = Math.PI / 180;
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload }: any) => {
+    if (payload.percent < 4) return null; // Dilim çok küçükse ikonu gizle
+
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+    return (
+        <foreignObject x={x - 10} y={y - 10} width={20} height={20}>
+            <div className="w-full h-full flex items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
+                <DynamicIcon name={payload.icon} size={14} color="#ffffff" />
+            </div>
+        </foreignObject>
+    );
+};
+
 export default function StatisticsExportModal({
     isOpen,
     onClose,
@@ -36,9 +53,6 @@ export default function StatisticsExportModal({
     selectedDate,
     stats,
     totalDuration,
-    records,
-    recordTypes,
-    runningRecord,
 }: StatisticsExportModalProps) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -51,47 +65,24 @@ export default function StatisticsExportModal({
     const periodTitle = useMemo(() => {
         if (viewMode === 'day') {
             const today = new Date();
-            if (selectedDate.toDateString() === today.toDateString()) return 'Bugün (Günlük Rapor)';
-            return selectedDate.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            if (selectedDate.toDateString() === today.toDateString()) return 'Bugün';
+            return selectedDate.toLocaleDateString('tr-TR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
         }
         if (viewMode === 'month') {
-            return selectedDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) + ' Raporu';
+            return selectedDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
         }
         if (viewMode === 'year') {
-            return `${selectedDate.getFullYear()} Yıllık İstatistik Raporu`;
+            return `${selectedDate.getFullYear()} Yılı`;
         }
-        return 'Tüm Zamanlar İstatistik Raporu';
+        return 'Tüm Zamanlar';
     }, [viewMode, selectedDate]);
 
-    // Active days and streak calculation for the export banner
-    const { activeDaysCount, totalSessions } = useMemo(() => {
-        let allRecords = [...records];
-        if (runningRecord) {
-            allRecords.push({
-                ...runningRecord,
-                endTime: new Date().toISOString(),
-                duration: Math.floor((Date.now() - new Date(runningRecord.startTime).getTime()) / 1000),
-            } as any);
-        }
-        const split = allRecords.flatMap(r => splitRecordByDays(r));
-        const days = new Set<string>();
-        let sessions = 0;
-
-        for (const r of split) {
-            const d = new Date(r.startTime);
-            if (viewMode === 'day' && d.toDateString() !== selectedDate.toDateString()) continue;
-            if (viewMode === 'month' && (d.getMonth() !== selectedDate.getMonth() || d.getFullYear() !== selectedDate.getFullYear())) continue;
-            if (viewMode === 'year' && d.getFullYear() !== selectedDate.getFullYear()) continue;
-
-            days.add(d.toDateString());
-            sessions++;
-        }
-
-        return {
-            activeDaysCount: days.size,
-            totalSessions: sessions,
-        };
-    }, [records, runningRecord, viewMode, selectedDate]);
+    const periodBadge = useMemo(() => {
+        if (viewMode === 'day') return 'Günlük';
+        if (viewMode === 'month') return 'Aylık';
+        if (viewMode === 'year') return 'Yıllık';
+        return 'Genel';
+    }, [viewMode]);
 
     // Generate PNG image on modal open
     useEffect(() => {
@@ -106,19 +97,19 @@ export default function StatisticsExportModal({
 
         const generate = async () => {
             try {
-                // Wait for document fonts and SVG charts to settle
                 if (document.fonts) {
                     await document.fonts.ready;
                 }
-                await new Promise((r) => setTimeout(r, 200));
+                // Short wait to ensure SVG paths are completely painted
+                await new Promise((r) => setTimeout(r, 220));
 
                 if (!exportCardRef.current || !isMounted) return;
 
                 const dataUrl = await toPng(exportCardRef.current, {
                     pixelRatio: 2,
-                    quality: 0.95,
+                    quality: 0.96,
                     cacheBust: true,
-                    backgroundColor: isDark ? '#0a0a0a' : '#f8fafc',
+                    backgroundColor: isDark ? '#0d0d0d' : '#f8fafc',
                 });
 
                 if (isMounted) {
@@ -126,7 +117,7 @@ export default function StatisticsExportModal({
                     setIsGenerating(false);
                 }
             } catch (err) {
-                console.error('Failed to generate image:', err);
+                console.error('Failed to generate page image:', err);
                 if (isMounted) setIsGenerating(false);
             }
         };
@@ -154,17 +145,17 @@ export default function StatisticsExportModal({
         try {
             const blob = await toBlob(exportCardRef.current, {
                 pixelRatio: 2,
-                quality: 0.95,
-                backgroundColor: isDark ? '#0a0a0a' : '#f8fafc',
+                quality: 0.96,
+                backgroundColor: isDark ? '#0d0d0d' : '#f8fafc',
             });
             if (!blob) return;
 
-            const file = new File([blob], `istatistik-${selectedDate.getFullYear()}.png`, { type: 'image/png' });
+            const file = new File([blob], `istatistik-${periodTitle.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`, { type: 'image/png' });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     title: `Simple Time Tracker - ${periodTitle}`,
-                    text: `${periodTitle} için zaman takibi istatistiklerim: Toplam ${formatDuration(totalDuration)}`,
+                    text: `${periodTitle} zaman takibi istatistikleri: Toplam ${formatDuration(totalDuration)}`,
                     files: [file],
                 });
             } else {
@@ -181,16 +172,19 @@ export default function StatisticsExportModal({
         try {
             const blob = await toBlob(exportCardRef.current, {
                 pixelRatio: 2,
-                quality: 0.95,
-                backgroundColor: isDark ? '#0a0a0a' : '#f8fafc',
+                quality: 0.96,
+                backgroundColor: isDark ? '#0d0d0d' : '#f8fafc',
             });
             if (!blob) return;
 
-            await navigator.clipboard.write([
-                new ClipboardItem({ 'image/png': blob })
-            ]);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            if (navigator.clipboard && 'write' in navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            } else {
+                handleDownload();
+            }
         } catch {
             handleDownload();
         }
@@ -216,26 +210,26 @@ export default function StatisticsExportModal({
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.94, y: 15 }}
                     transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                    className="relative w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl border border-gray-100 dark:border-neutral-800 shadow-2xl overflow-hidden z-10 flex flex-col max-h-[92dvh]"
+                    className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-3xl border border-gray-100 dark:border-neutral-800 shadow-2xl overflow-hidden z-10 flex flex-col max-h-[92dvh]"
                 >
                     {/* Modal Header */}
                     <div className="px-5 py-4 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between flex-shrink-0 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md">
                         <div className="flex items-center gap-2.5">
                             <div
-                                className="w-9 h-9 rounded-xl flex items-center justify-center text-xs shadow-xs"
+                                className="w-8 h-8 rounded-xl flex items-center justify-center text-xs shadow-xs"
                                 style={{
                                     backgroundColor: 'var(--primary-soft, rgba(255, 145, 0, 0.15))',
                                     color: 'var(--primary, #ff9100)',
                                 }}
                             >
-                                <Sparkles size={18} />
+                                <Share2 size={16} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                    Resim Olarak Dışa Aktar
+                                    İstatistik Sayfası Görüntüsü
                                 </h3>
                                 <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                                    Tek sayfa yüksek çözünürlüklü istatistik kartı
+                                    {periodTitle} • {periodBadge} Özet
                                 </p>
                             </div>
                         </div>
@@ -253,27 +247,27 @@ export default function StatisticsExportModal({
                     <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-gray-50/60 dark:bg-neutral-950/60 flex flex-col items-center justify-center min-h-[280px]">
                         {isGenerating ? (
                             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-                                <Loader2 size={32} className="animate-spin text-primary" style={{ color: 'var(--primary, #ff9100)' }} />
+                                <Loader2 size={30} className="animate-spin" style={{ color: 'var(--primary, #ff9100)' }} />
                                 <div>
                                     <p className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                                        İstatistik Görseli Hazırlanıyor...
+                                        Sayfa Görüntüsü Hazırlanıyor...
                                     </p>
                                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                        Grafikler ve ısı haritası render ediliyor
+                                        İstatistik dairesi ve aktiviteler render ediliyor
                                     </p>
                                 </div>
                             </div>
                         ) : imageUrl ? (
                             <div className="space-y-3 w-full flex flex-col items-center">
-                                <div className="rounded-2xl overflow-hidden shadow-xl border border-gray-200/80 dark:border-neutral-800 max-h-[50dvh] overflow-y-auto w-full bg-white dark:bg-neutral-900">
+                                <div className="rounded-2xl overflow-hidden shadow-xl border border-gray-200/80 dark:border-neutral-800 max-h-[52dvh] overflow-y-auto w-full bg-white dark:bg-neutral-900">
                                     <img
                                         src={imageUrl}
-                                        alt="İstatistik Raporu"
+                                        alt="İstatistik Sayfası"
                                         className="w-full h-auto block select-none"
                                     />
                                 </div>
                                 <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center">
-                                    💡 İpucu: Mobilde görselin üzerine basılı tutarak doğrudan galerinize de kaydedebilirsiniz.
+                                    💡 İpucu: Mobilde görselin üzerine basılı tutarak doğrudan galerinize kaydedebilirsiniz.
                                 </p>
                             </div>
                         ) : null}
@@ -317,7 +311,7 @@ export default function StatisticsExportModal({
                     </div>
                 </motion.div>
 
-                {/* ── OFF-SCREEN DEDICATED EXPORT TEMPLATE (Pixel-Perfect 680px High-Res Infographic) ── */}
+                {/* ── OFF-SCREEN DEDICATED SNAPSHOT TEMPLATE (Circle + Activities) ── */}
                 <div
                     style={{
                         position: 'fixed',
@@ -329,167 +323,117 @@ export default function StatisticsExportModal({
                 >
                     <div
                         ref={exportCardRef}
-                        style={{ width: '680px' }}
-                        className={`p-8 rounded-[36px] font-sans ${
-                            isDark ? 'dark bg-[#0a0a0a] text-white' : 'bg-[#f8fafc] text-gray-900'
-                        } border border-gray-200/80 dark:border-neutral-800 shadow-2xl space-y-6`}
+                        style={{ width: '450px' }}
+                        className={`p-6 rounded-[32px] font-sans ${
+                            isDark ? 'dark bg-[#0d0d0d] text-white' : 'bg-[#f8fafc] text-gray-900'
+                        } border border-gray-200/80 dark:border-neutral-800 shadow-2xl space-y-5`}
                     >
-                        {/* 1. Header & App Branding */}
-                        <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-neutral-800">
-                            <div className="flex items-center gap-3">
-                                <div
-                                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md font-bold text-xl"
-                                    style={{
-                                        backgroundColor: 'var(--primary, #ff9100)',
-                                        color: 'var(--primary-contrast, #ffffff)',
-                                    }}
-                                >
-                                    ⏱️
-                                </div>
-                                <div>
-                                    <h1 className="text-lg font-black tracking-tight uppercase">
-                                        Simple Time Tracker
-                                    </h1>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-semibold mt-0.5">
-                                        {periodTitle}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="text-right">
-                                <span
-                                    className="text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider"
-                                    style={{
-                                        backgroundColor: 'var(--primary-soft, rgba(255,145,0,0.15))',
-                                        color: 'var(--primary, #ff9100)',
-                                    }}
-                                >
-                                    {viewMode === 'year' ? 'Yıllık Özet' : viewMode === 'month' ? 'Aylık Özet' : 'Günlük Özet'}
-                                </span>
-                                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 font-mono">
-                                    {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {/* 1. Header with Period & Branding */}
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-neutral-800">
+                            <div>
+                                <h1 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">
+                                    İstatistikler
+                                </h1>
+                                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 mt-0.5">
+                                    {periodTitle}
                                 </p>
                             </div>
+
+                            <span
+                                className="text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider"
+                                style={{
+                                    backgroundColor: 'var(--primary-soft, rgba(255,145,0,0.15))',
+                                    color: 'var(--primary, #ff9100)',
+                                }}
+                            >
+                                {periodBadge}
+                            </span>
                         </div>
 
-                        {/* 2. Hero Total Stats Banner */}
-                        <div className="p-6 rounded-3xl bg-white dark:bg-[#121212] border border-gray-100 dark:border-neutral-800/80 shadow-sm flex items-center justify-between">
-                            <div>
-                                <span className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                    Toplam Süre
-                                </span>
-                                <div
-                                    className="text-4xl font-black tracking-tight mt-1"
-                                    style={{ color: 'var(--primary, #ff9100)' }}
+                        {/* 2. Donut Pie Chart (İstatistik Circle'ı) */}
+                        <div className="relative w-full flex items-center justify-center my-2">
+                            <PieChart width={390} height={230}>
+                                <Pie
+                                    data={stats}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={72}
+                                    outerRadius={106}
+                                    paddingAngle={stats.length > 1 ? 3 : 0}
+                                    dataKey="duration"
+                                    nameKey="name"
+                                    stroke="none"
+                                    isAnimationActive={false}
+                                    labelLine={false}
+                                    label={renderCustomizedLabel}
                                 >
+                                    {stats.map((entry) => (
+                                        <Cell key={entry.id} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                            </PieChart>
+                            {/* Center Duration & Label */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span className="text-2xl font-black tracking-tight text-gray-900 dark:text-white tabular-nums">
                                     {formatDuration(totalDuration)}
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-6 text-right">
-                                <div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                        Aktiviteler
-                                    </span>
-                                    <div className="text-2xl font-bold text-gray-800 dark:text-gray-200 mt-0.5">
-                                        {stats.length}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <span className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                        Seans Sayısı
-                                    </span>
-                                    <div className="text-2xl font-bold text-gray-800 dark:text-gray-200 mt-0.5">
-                                        {totalSessions}
-                                    </div>
-                                </div>
-
-                                {viewMode !== 'day' && (
-                                    <div>
-                                        <span className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                                            Aktif Gün
-                                        </span>
-                                        <div className="text-2xl font-bold text-gray-800 dark:text-gray-200 mt-0.5">
-                                            {activeDaysCount}
-                                        </div>
-                                    </div>
-                                )}
+                                </span>
+                                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-0.5">
+                                    total
+                                </span>
                             </div>
                         </div>
 
-                        {/* 3. GitHub Activity Heatmap (Full width without horizontal scrollbars!) */}
-                        {viewMode !== 'day' && (
-                            <div className="rounded-3xl overflow-hidden border border-gray-100 dark:border-neutral-800/80 shadow-sm">
-                                <ActivityHeatmap
-                                    viewMode={viewMode}
-                                    selectedDate={selectedDate}
-                                    records={records}
-                                    recordTypes={recordTypes}
-                                    runningRecord={runningRecord}
-                                />
-                            </div>
-                        )}
+                        {/* 3. Section Header */}
+                        <div className="flex items-center justify-between pt-1 mb-1">
+                            <span className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                                Activities
+                            </span>
+                            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-200/70 dark:bg-neutral-800 px-2.5 py-0.5 rounded-full">
+                                {stats.length} {stats.length === 1 ? 'activity' : 'activities'}
+                            </span>
+                        </div>
 
-                        {/* 4. Activities Breakdown Table */}
-                        <div className="p-6 rounded-3xl bg-white dark:bg-[#121212] border border-gray-100 dark:border-neutral-800/80 shadow-sm space-y-3.5">
-                            <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-neutral-800">
-                                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                    Aktivite Dağılımı ({stats.length})
-                                </span>
-                                <span className="text-xs font-semibold text-gray-400 dark:text-gray-500">
-                                    Oran & Süre
-                                </span>
-                            </div>
-
-                            <div className="space-y-2.5">
-                                {stats.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        className="p-3 rounded-2xl bg-gray-50/70 dark:bg-neutral-800/50 border border-gray-100 dark:border-neutral-800/50 flex items-center justify-between"
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div
-                                                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-xs"
-                                                style={{ backgroundColor: item.color }}
-                                            >
-                                                <DynamicIcon name={item.icon} size={20} color="#ffffff" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
-                                                    {item.name}
-                                                </p>
-                                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                                    %{Math.round(item.percent)} • {item.sessionCount} seans
-                                                </p>
-                                            </div>
+                        {/* 4. Activities List Matching the Screen */}
+                        <div className="space-y-2">
+                            {stats.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className="p-3.5 rounded-2xl bg-white dark:bg-[#161616] border border-gray-100 dark:border-neutral-800/80 shadow-xs flex items-center justify-between"
+                                >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div
+                                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white shadow-xs"
+                                            style={{ backgroundColor: item.color }}
+                                        >
+                                            <DynamicIcon name={item.icon} size={20} color="#ffffff" />
                                         </div>
-
-                                        <div className="text-right">
-                                            <span className="text-sm font-black font-mono text-gray-900 dark:text-gray-100">
-                                                {formatDuration(item.duration)}
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
+                                                {item.name}
+                                            </p>
+                                            <span className="text-xs text-gray-400 dark:text-gray-500 font-semibold">
+                                                %{Math.round(item.percent)}
                                             </span>
-                                            {/* Mini Progress Bar */}
-                                            <div className="w-24 h-1.5 bg-gray-200 dark:bg-neutral-700 rounded-full mt-1.5 overflow-hidden ml-auto">
-                                                <div
-                                                    className="h-full rounded-full"
-                                                    style={{
-                                                        width: `${Math.max(4, Math.round(item.percent))}%`,
-                                                        backgroundColor: item.color,
-                                                    }}
-                                                />
-                                            </div>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+
+                                    <div className="text-right">
+                                        <span className="text-sm font-bold text-gray-900 dark:text-gray-100 tabular-nums">
+                                            {formatDuration(item.duration)}
+                                        </span>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                                            {item.sessionCount} {item.sessionCount === 1 ? 'session' : 'sessions'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
 
-                        {/* 5. Watermark Footer */}
-                        <div className="pt-2 text-center text-xs text-gray-400 dark:text-gray-500 flex items-center justify-center gap-2">
-                            <span>Simple Time Tracker</span>
-                            <span>•</span>
-                            <span>Zaman Takip & Verimlilik Raporu</span>
+                        {/* 5. Minimal Branding Footer */}
+                        <div className="pt-2 text-center border-t border-gray-100 dark:border-neutral-800/80">
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">
+                                Simple Time Tracker
+                            </p>
                         </div>
                     </div>
                 </div>

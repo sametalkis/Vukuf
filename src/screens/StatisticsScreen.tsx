@@ -212,11 +212,11 @@ export default function StatisticsScreen() {
                         <button
                             type="button"
                             onClick={() => setIsExportOpen(true)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800 text-xs font-bold text-gray-700 dark:text-gray-200 border border-gray-200/80 dark:border-neutral-800 shadow-xs transition-all active:scale-95 cursor-pointer"
-                            title="İstatistikleri tek sayfa resim olarak dışa aktar"
+                            className="w-10 h-10 rounded-2xl bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-200 border border-gray-200/80 dark:border-neutral-800 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                            title="Paylaş"
+                            aria-label="Paylaş"
                         >
-                            <Share2 size={13} style={{ color: 'var(--primary, #ff9100)' }} />
-                            <span>Resim Paylaş / Kaydet</span>
+                            <Share2 size={18} style={{ color: 'var(--primary, #ff9100)' }} />
                         </button>
                     </div>
 
