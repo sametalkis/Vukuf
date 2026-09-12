@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { AlertCircle, Check, Download, Link2, RefreshCw, ShieldCheck, Smartphone, Unplug } from 'lucide-react';
-import { createInvite, createVault, deleteVault, disconnect, joinVault, listDevices, recover, recoveryPackage, revokeDevice, rotateKey, syncNow, useSyncStatus } from '../sync/engine';
+import { AlertCircle, Bot, Check, Copy, Download, ExternalLink, Link2, RefreshCw, ShieldCheck, Smartphone, Sparkles, Unplug, X } from 'lucide-react';
+import { createInvite, createVault, deleteVault, disconnect, generateMcpConnection, joinVault, listDevices, recover, recoveryPackage, revokeDevice, rotateKey, syncNow, useSyncStatus } from '../sync/engine';
 import type { Device } from '../sync/engine';
 import { allOperations, latestBackup, resolveConflict } from '../sync/storage';
 import { entityKey, headsFor } from '../../shared/sync';
@@ -61,6 +61,7 @@ export default function SyncPanel() {
     const [recoveryCode, setRecoveryCode] = useState('');
     const [recoveryFile, setRecoveryFile] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [mcp, setMcp] = useState<{ url: string; copied: boolean } | null>(null);
     const localCount = useStore(s => s.records.length);
     const run = async (fn: () => Promise<unknown>) => { setError(null); try { await fn(); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } };
     useEffect(() => {
@@ -71,6 +72,10 @@ export default function SyncPanel() {
     const makeInvite = async () => {
         const result = await createInvite();
         setInvite({ ...result, qr: await QRCode.toDataURL(result.link, { errorCorrectionLevel: 'M', margin: 3, width: 320, color: { dark: '#111111', light: '#ffffff' } }) });
+    };
+    const makeMcpConnection = async () => {
+        const res = await generateMcpConnection();
+        setMcp({ url: res.mcpUrl, copied: false });
     };
     const isSecure = typeof window === 'undefined' || window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     return <section className="space-y-3" aria-labelledby="sync-heading">
@@ -101,14 +106,139 @@ export default function SyncPanel() {
                     <button className={button} disabled={!recoveryFile || !recoveryCode || status.busy} onClick={() => { void run(async () => { await recover(recoveryFile, recoveryCode); setRecoveryCode(''); setRecoveryFile(''); }); }}>Erişimi geri kazan</button>
                 </div></details>
             </> : <>
-                <div className="flex flex-wrap gap-2"><button className={button} disabled={status.busy} onClick={() => { void syncNow(); }}><RefreshCw size={16} /> Şimdi eşitle</button><button className={button} disabled={status.busy} onClick={() => { void run(makeInvite); }}>Yeni cihaz ekle</button></div>
+                <div className="flex flex-wrap gap-2">
+                    <button className={button} disabled={status.busy} onClick={() => { void syncNow(); }}><RefreshCw size={16} /> Şimdi eşitle</button>
+                    <button className={button} disabled={status.busy} onClick={() => { void run(makeInvite); }}>Yeni cihaz ekle</button>
+                    <button className={button} disabled={status.busy} onClick={() => { void run(makeMcpConnection); }}><Bot size={16} /> AI Asistanı Bağla</button>
+                </div>
+                {mcp && (
+                    <div className="space-y-4 p-4 rounded-2xl bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="p-2 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100 shrink-0">
+                                    <Bot size={18} />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">AI Asistanı (MCP) Bağlantısı</h3>
+                                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Süresiz</span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">ChatGPT Web ve Claude Web için şifreli köprü</p>
+                                </div>
+                            </div>
+                            <button
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200/60 dark:hover:bg-gray-800 transition-colors"
+                                onClick={() => setMcp(null)}
+                                title="Kapat"
+                                aria-label="Kapat"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Özel MCP Bağlantı Adresi</label>
+                            <input className={`${input} font-mono text-xs select-all`} readOnly value={mcp.url} />
+                            <div className="flex flex-wrap gap-2 pt-0.5">
+                                <button
+                                    className={`${button} ${mcp.copied ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+                                    onClick={() => {
+                                        void navigator.clipboard.writeText(mcp.url);
+                                        setMcp({ ...mcp, copied: true });
+                                        setTimeout(() => setMcp(prev => prev ? { ...prev, copied: false } : null), 2000);
+                                    }}
+                                    title="Bağlantıyı kopyala"
+                                >
+                                    {mcp.copied ? <Check size={16} /> : <Copy size={16} />}
+                                    <span>{mcp.copied ? 'Kopyalandı' : 'Kopyala'}</span>
+                                </button>
+                                <button
+                                    className={button}
+                                    onClick={() => {
+                                        void navigator.clipboard.writeText(mcp.url);
+                                        setMcp({ ...mcp, copied: true });
+                                        const claudeUrl = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent('Simple Time Tracker')}&connectorUrl=${encodeURIComponent(mcp.url)}`;
+                                        window.open(claudeUrl, '_blank', 'noopener,noreferrer');
+                                        setTimeout(() => setMcp(prev => prev ? { ...prev, copied: false } : null), 2000);
+                                    }}
+                                    title="Claude Web'de modalı ve alanları otomatik doldurulmuş olarak aç"
+                                >
+                                    <ExternalLink size={16} />
+                                    <span>Claude'a Ekle</span>
+                                </button>
+                                <button
+                                    className={button}
+                                    onClick={() => {
+                                        void navigator.clipboard.writeText(mcp.url);
+                                        setMcp({ ...mcp, copied: true });
+                                        const chatgptUrl = `https://chatgpt.com/plugins#settings/Connectors?create-connector=true&name=${encodeURIComponent('Simple Time Tracker')}&url=${encodeURIComponent(mcp.url)}&connectorName=${encodeURIComponent('Simple Time Tracker')}&connectorUrl=${encodeURIComponent(mcp.url)}&redirectAfter=%2Fplugins`;
+                                        window.open(chatgptUrl, '_blank', 'noopener,noreferrer');
+                                        setTimeout(() => setMcp(prev => prev ? { ...prev, copied: false } : null), 2000);
+                                    }}
+                                    title="ChatGPT'de bağlantı kutusunu açar ve URL'i panoya kopyalar (Ctrl+V ile yapıştırın)"
+                                >
+                                    <ExternalLink size={16} />
+                                    <span>ChatGPT'ye Ekle</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 pt-1">
+                            <details className="border-t border-gray-200 dark:border-gray-800 pt-3">
+                                <summary className="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 flex items-center gap-1.5">
+                                    <Sparkles size={13} className="text-gray-400" /> ChatGPT Web Kurulumu (Developer Mode)
+                                </summary>
+                                <ol className="list-decimal list-inside space-y-1 mt-2 text-xs text-gray-600 dark:text-gray-400 pl-1 leading-relaxed">
+                                    <li>Yukarıdaki <strong>ChatGPT Plugins Aç</strong> butonuna tıklayın (veya Profil → Developer Mode → Plugins → Add Plugin açın).</li>
+                                    <li><strong>Name:</strong> <code>Simple Time Tracker</code> yazın.</li>
+                                    <li><strong>Connection:</strong> <code>Server URL</code> seçin ve kopyaladığınız adresi yapıştırın.</li>
+                                    <li><strong>Authentication:</strong> <code>No Auth</code> seçin (Erişim anahtarlarınız URL parametresinde şifreli taşınır).</li>
+                                    <li>Onay kutucuğunu işaretleyip <strong>Create</strong> deyin.</li>
+                                </ol>
+                            </details>
+
+                            <details className="border-t border-gray-200 dark:border-gray-800 pt-3">
+                                <summary className="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 flex items-center gap-1.5">
+                                    <Sparkles size={13} className="text-gray-400" /> Claude Web (claude.ai) Kurulumu
+                                </summary>
+                                <ol className="list-decimal list-inside space-y-1 mt-2 text-xs text-gray-600 dark:text-gray-400 pl-1 leading-relaxed">
+                                    <li>Yukarıdaki <strong>Claude Connectors Aç</strong> butonuna tıklayın (veya Customize → Connectors sekmesine gidin).</li>
+                                    <li><strong>Add Custom Connector (Remote MCP)</strong> butonuna tıklayın.</li>
+                                    <li>URL alanına kopyaladığınız adresi yapıştırıp kaydedin.</li>
+                                </ol>
+                            </details>
+
+                            <details className="border-t border-gray-200 dark:border-gray-800 pt-3">
+                                <summary className="cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
+                                    Claude Desktop / Cursor Yapılandırması
+                                </summary>
+                                <div className="mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+                                    <p><code>claude_desktop_config.json</code> dosyanıza ekleyin:</p>
+                                    <pre className="p-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 font-mono text-[11px] overflow-x-auto text-gray-800 dark:text-gray-200">
+{JSON.stringify({
+  mcpServers: {
+    "simple-time-tracker": {
+      url: mcp.url
+    }
+  }
+}, null, 2)}
+                                    </pre>
+                                </div>
+                            </details>
+                        </div>
+
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-800 pt-3 leading-relaxed">
+                            Bu bağlantı süresizdir. ChatGPT veya Claude üzerinden <em>"Sayacı başlat"</em>, <em>"Bugün ne kadar çalıştım?"</em>, <em>"Sayacı durdur"</em> dediğinizde kasanıza anında işlenir. İstediğiniz an aşağıdaki <em>Bağlı cihazlar</em> listesinden yetkiyi kaldırabilirsiniz.
+                        </p>
+                    </div>
+                )}
                 {invite && <div className="space-y-3">
                     <img src={invite.qr} width={320} height={320} alt="Cihaz eşleştirme QR kodu" className="block max-w-full mx-auto rounded-xl" />
                     <p className="text-sm text-gray-600 dark:text-gray-400">Telefon kamerasıyla okutun. Tek kullanımlık davet {new Date(invite.expires).toLocaleTimeString('tr-TR')} saatinde sona erer. Bu bağlantıyı yalnızca kendi cihazınızda açın.</p>
                     <div className="flex gap-2"><button className={button} onClick={() => { void run(() => navigator.clipboard.writeText(invite.link)); }}>Bağlantıyı kopyala</button><button className={button} onClick={() => setInvite(null)}>QR kodunu gizle</button></div>
                 </div>}
                 <details><summary className="text-sm font-semibold cursor-pointer" onClick={() => { void run(async () => setDevices(await listDevices())); }}>Bağlı cihazlar</summary>
-                    <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-800">{devices.map(device => <li key={device.id} className="py-3 flex items-center justify-between gap-2"><span className="text-sm">{device.id === status.deviceId ? 'Bu cihaz' : `Cihaz ${device.id.slice(0, 6)}`}<span className="block text-xs text-gray-600 dark:text-gray-400">{device.role === 'admin' ? 'Yönetici' : 'Eşleşmiş cihaz'} · {new Date(device.seen).toLocaleDateString('tr-TR')}</span></span>{status.role === 'admin' && device.id !== status.deviceId && <button className={button} disabled={status.busy} onClick={() => { if (confirm('Bu cihazın sunucu erişimi kapatılsın mı? Daha önce indirdiği veriler silinmez.')) void run(async () => { await revokeDevice(device.id); setDevices(await listDevices()); }); }}>Erişimi kapat</button>}</li>)}</ul>
+                    <ul className="mt-2 divide-y divide-gray-200 dark:divide-gray-800">{devices.map(device => <li key={device.id} className="py-3 flex items-center justify-between gap-2"><div className="flex items-center gap-2 min-w-0">{device.id.startsWith('ai_') && <Bot size={16} className="text-gray-500 dark:text-gray-400 shrink-0" />}<div className="min-w-0"><span className="text-sm font-medium">{device.id === status.deviceId ? 'Bu cihaz' : device.id.startsWith('ai_') ? 'AI Asistanı (ChatGPT / Claude)' : `Cihaz ${device.id.slice(0, 6)}`}</span><span className="block text-xs text-gray-600 dark:text-gray-400">{device.id.startsWith('ai_') ? 'Yazma yetkisi (MCP)' : device.role === 'admin' ? 'Yönetici' : 'Eşleşmiş cihaz'} · {new Date(device.seen).toLocaleDateString('tr-TR')}</span></div></div>{status.role === 'admin' && device.id !== status.deviceId && <button className={button} disabled={status.busy} onClick={() => { if (confirm(`${device.id.startsWith('ai_') ? 'AI Asistanının' : 'Bu cihazın'} sunucu erişimi kapatılsın mı?`)) void run(async () => { await revokeDevice(device.id); setDevices(await listDevices()); }); }}>Erişimi kapat</button>}</li>)}</ul>
                 </details>
                 {status.role === 'admin' && <details><summary className="text-sm font-semibold cursor-pointer">Kurtarma ve güvenlik</summary><div className="space-y-3 pt-3">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Kurtarma dosyası ve kodunu birlikte saklayın. Bu paket zaman kayıtlarının yedeği değildir.</p>

@@ -1,6 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
-import { MAX_PACKET_BYTES, PROTOCOL_VERSION, SCHEMA_VERSION, VAULT_QUOTA } from '../shared/sync';
-import type { CipherBox } from '../shared/sync';
+import { MAX_PACKET_BYTES, PROTOCOL_VERSION, SCHEMA_VERSION, VAULT_QUOTA, project } from '../shared/sync';
+import type { CipherBox, Operation } from '../shared/sync';
+import { importSecretKey, open, seal, gzipCompress, gzipDecompress, processMcpRpc } from './mcp';
+import type { McpContext } from './mcp';
 
 interface Env { SYNC_VAULTS: DurableObjectNamespace<SyncVault>; ASSETS: Fetcher; SYNC_CREATE_CODE?: string }
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' } });
@@ -24,9 +26,95 @@ function checkBox(box: CipherBox, context: string, keyVersion: number) {
     if (!box || box.protocolVersion !== PROTOCOL_VERSION || box.schemaVersion !== SCHEMA_VERSION) fail('upgrade_required', 409);
     if (box.context !== context || box.keyVersion !== keyVersion || !/^[\w-]{16}$/.test(box.iv) || typeof box.ciphertext !== 'string' || !/^[\w-]+$/.test(box.ciphertext) || box.ciphertext.length < 22 || JSON.stringify(box).length > MAX_PACKET_BYTES) fail('invalid_packet');
 }
+
+async function handleMcpRequest(req: Request, env: Env): Promise<Response> {
+    const url = new URL(req.url);
+    const corsHeaders: Record<string, string> = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-STT-Version, x-stt-auth',
+        'Content-Type': 'application/json',
+    };
+
+    let vaultId = url.searchParams.get('vault') || url.searchParams.get('vaultId');
+    let deviceId = url.searchParams.get('device') || url.searchParams.get('deviceId');
+    let token = url.searchParams.get('token');
+    let secretKey = url.searchParams.get('key') || url.searchParams.get('secretKey');
+
+    const rawAuth = url.searchParams.get('auth') || req.headers.get('x-stt-auth') || req.headers.get('Authorization')?.replace(/^Bearer /, '');
+    if (rawAuth && rawAuth.includes(':')) {
+        const parts = rawAuth.split(':');
+        if (parts.length >= 4) {
+            [vaultId, deviceId, token, secretKey] = parts;
+        }
+    }
+
+    if (req.method === 'GET') {
+        return new Response(JSON.stringify({
+            name: 'Simple Time Tracker MCP Server',
+            version: '1.0.0',
+            status: 'ready',
+            authenticated: !!(vaultId && deviceId && token && secretKey),
+            transport: 'streamable-http',
+        }), { status: 200, headers: corsHeaders });
+    }
+
+    let rpcBody: Record<string, unknown>;
+    try {
+        rpcBody = await req.json() as Record<string, unknown>;
+    } catch {
+        return new Response(JSON.stringify({
+            jsonrpc: '2.0',
+            id: null,
+            error: { code: -32700, message: 'Parse error: Geçersiz JSON gövdesi.' }
+        }), { status: 400, headers: corsHeaders });
+    }
+
+    if (!vaultId || !deviceId || !token || !secretKey) {
+        return new Response(JSON.stringify({
+            jsonrpc: '2.0',
+            id: rpcBody.id ?? null,
+            error: {
+                code: -32000,
+                message: 'Kimlik doğrulama başarısız. Lütfen URL parametresinde (?auth=vaultId:deviceId:token:secretKey) veya Authorization başlığında geçerli kasa erişim bilgilerinizi sağlayın.'
+            }
+        }), { status: 401, headers: corsHeaders });
+    }
+
+    try {
+        const stub = env.SYNC_VAULTS.get(env.SYNC_VAULTS.idFromName(vaultId));
+        const res = await stub.executeMcp(deviceId, token, secretKey, rpcBody);
+        if (!res) {
+            return new Response(null, { status: 204, headers: corsHeaders });
+        }
+        return new Response(JSON.stringify(res), { status: 200, headers: corsHeaders });
+    } catch (error) {
+        const err = error as Error;
+        return new Response(JSON.stringify({
+            jsonrpc: '2.0',
+            id: rpcBody.id ?? null,
+            error: { code: -32603, message: `Sunucu hatası: ${err.message}` }
+        }), { status: 500, headers: corsHeaders });
+    }
+}
+
 export default {
     async fetch(req: Request, env: Env): Promise<Response> {
+        if (req.method === 'OPTIONS') {
+            return new Response(null, {
+                status: 204,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-STT-Version, x-stt-auth',
+                    'Access-Control-Max-Age': '86400',
+                },
+            });
+        }
         const url = new URL(req.url);
+        if (url.pathname === '/mcp' || url.pathname.startsWith('/mcp/') || url.pathname === '/api/mcp') {
+            return handleMcpRequest(req, env);
+        }
         if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
         try {
             if (!url.pathname.startsWith('/api/sync/')) return json({ error: 'not_found' }, 404);
@@ -146,6 +234,14 @@ export class SyncVault extends DurableObject<Env> {
             this.sql.exec('UPDATE devices SET seen = ? WHERE id = ?', now, device.id);
             if (path === '/meta' && req.method === 'GET') return json({ protocolVersion: 1, schemaVersion: 1, keyVersion: cfg.epoch, initialized: !!cfg.initialized, headSeq: this.sql.exec<{ n: number }>('SELECT COALESCE(MAX(seq),0) AS n FROM packets').one().n, serverTime: now, bytes: this.bytes(), quota: VAULT_QUOTA });
             if (path === '/devices' && req.method === 'GET') return json(this.sql.exec('SELECT id, role, created, seen FROM devices').toArray());
+            if (path === '/devices' && req.method === 'POST') {
+                if (device.role !== 'admin') fail('forbidden', 403);
+                const input = await body<{ deviceId: string; tokenHash: string; role?: string }>(req);
+                if (!validId(input.deviceId) || !validHash(input.tokenHash)) fail('invalid_identity');
+                if (this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM devices').one().n >= 20) fail('device_limit', 409);
+                this.sql.exec('INSERT INTO devices VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET token = excluded.token, seen = excluded.seen', input.deviceId, input.tokenHash, input.role ?? 'write', now, now);
+                return json({ ok: true });
+            }
             if (path.startsWith('/devices/') && req.method === 'DELETE') {
                 const id = path.slice('/devices/'.length);
                 if (device.role !== 'admin' && id !== device.id) fail('forbidden', 403);
@@ -234,5 +330,86 @@ export class SyncVault extends DurableObject<Env> {
             const e = error as Error & { status?: number };
             return json({ error: e.status ? e.message : 'server_error', ...(e.message === 'upgrade_required' ? { minVersion: 1 } : {}) }, e.status ?? 500);
         }
+    }
+
+    async executeMcp(
+        deviceId: string,
+        token: string,
+        secretKey: string,
+        rpcPayload: Record<string, unknown>
+    ): Promise<Record<string, unknown> | null> {
+        const cfg = this.config();
+        const tokenHash = await hash(token);
+        const device = this.sql.exec<{ id: string; role: string }>(
+            'SELECT id, role FROM devices WHERE id = ? AND token = ?',
+            deviceId,
+            tokenHash
+        ).toArray()[0];
+
+        if (!device) {
+            return {
+                jsonrpc: '2.0',
+                id: (rpcPayload.id as string | number) ?? null,
+                error: {
+                    code: -32000,
+                    message: 'Cihaz yetkisi geçersiz veya kaldırılmış (device_revoked).',
+                },
+            };
+        }
+
+        const now = Date.now();
+        this.sql.exec('UPDATE devices SET seen = ? WHERE id = ?', now, device.id);
+
+        const key = await importSecretKey(secretKey);
+
+        const rows = this.sql.exec<{ seq: number; id: string; data: string }>(
+            'SELECT seq, id, data FROM packets ORDER BY seq'
+        ).toArray();
+
+        const allOps: Operation[] = [];
+        for (const row of rows) {
+            try {
+                const box = JSON.parse(row.data) as CipherBox;
+                const context = `data:${cfg.vault}:${box.keyVersion}:${row.id}`;
+                const decryptedBytes = await open(key, box, context, box.keyVersion);
+                const decompressed = await gzipDecompress(decryptedBytes);
+                const ops = JSON.parse(new TextDecoder().decode(decompressed)) as Operation[];
+                if (Array.isArray(ops)) {
+                    allOps.push(...ops);
+                }
+            } catch {
+                // Ignore unreadable or corrupted packet
+            }
+        }
+
+        const projection = project(allOps);
+
+        const commitOps = async (newOps: Operation[]) => {
+            if (!newOps.length) return;
+            if (device.role === 'read') throw new Error('Bu cihaz salt-okunur yetkiye sahip.');
+
+            const payloadBytes = new TextEncoder().encode(JSON.stringify(newOps));
+            const compressed = await gzipCompress(payloadBytes);
+            const packetId = `${crypto.randomUUID()}:0`;
+            const context = `data:${cfg.vault}:${cfg.epoch}:${packetId}`;
+            const box = await seal(key, compressed, context, cfg.epoch);
+
+            this.ctx.storage.transactionSync(() => {
+                this.sql.exec('INSERT INTO packets (id, data) VALUES (?, ?)', packetId, JSON.stringify(box));
+                this.sql.exec('UPDATE config SET initialized = 1');
+            });
+        };
+
+        const ctx: McpContext = {
+            vaultId: cfg.vault,
+            deviceId: device.id,
+            keyVersion: cfg.epoch,
+            key,
+            allOps,
+            projection,
+            commitOps,
+        };
+
+        return await processMcpRpc(rpcPayload, ctx);
     }
 }

@@ -5,22 +5,34 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 
 // https://vite.dev/config/
 export default defineConfig({
-  server: { proxy: { '/api': {
-    target: 'http://127.0.0.1:8787',
-    changeOrigin: true,
-    configure(proxy) {
-      proxy.on('proxyReq', (request, incoming) => {
-        // Dev-only bridge. Production still requires the exact request origin.
-        if (incoming.headers.origin) request.setHeader('Origin', 'http://127.0.0.1:8787');
-      });
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+        configure(proxy) {
+          proxy.on('proxyReq', (request, incoming) => {
+            if (incoming.headers.origin) request.setHeader('Origin', 'http://127.0.0.1:8787');
+          });
+        },
+      },
+      '/mcp': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: true,
+        configure(proxy) {
+          proxy.on('proxyReq', (request, incoming) => {
+            if (incoming.headers.origin) request.setHeader('Origin', 'http://127.0.0.1:8787');
+          });
+        },
+      },
     },
-  } } },
+  },
   plugins: [
     react(),
     basicSsl(),
     VitePWA({
       registerType: 'autoUpdate',
-      workbox: { navigateFallbackDenylist: [/^\/api\//] },
+      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/mcp/] },
       includeAssets: ['favicon.svg', 'icon.svg'],
       manifest: {
         name: 'Simple Time Tracker',

@@ -364,7 +364,23 @@ export async function recover(file: string, code: string) {
         await setMeta('credentials', credential); await setMeta('cursor', 0); await cycle();
     });
 }
+export async function generateMcpConnection(): Promise<{ mcpUrl: string; vaultId: string; deviceId: string }> {
+    return action(async () => {
+        const auth = await getCredential();
+        if (!auth) throw new Error('AI Asistanı bağlamak için önce E2EE Kasa Eşitlemesini başlatın.');
+        const aiDeviceId = 'ai_' + randomUUID().replace(/-/g, '').slice(0, 24);
+        const aiToken = randomSecret();
+        const tokenHash = await digest(aiToken);
+        const secretKey = await exportSecret(auth);
+
+        await api(vaultPath('/devices', auth), 'POST', { deviceId: aiDeviceId, tokenHash, role: 'write' });
+
+        const origin = window.location.origin;
+        const mcpUrl = `${origin}/mcp?auth=${auth.vaultId}:${aiDeviceId}:${aiToken}:${secretKey}`;
+        return { mcpUrl, vaultId: auth.vaultId, deviceId: aiDeviceId };
+    });
+}
 
 if (typeof window !== 'undefined') {
-    (window as unknown as Record<string, unknown>).__STT_SYNC__ = { syncNow, createInvite, joinVault, recoveryPackage, recover, deleteVault, getSyncState };
+    (window as unknown as Record<string, unknown>).__STT_SYNC__ = { syncNow, createInvite, joinVault, recoveryPackage, recover, deleteVault, getSyncState, generateMcpConnection };
 }
