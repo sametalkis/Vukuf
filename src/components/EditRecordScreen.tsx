@@ -112,7 +112,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
 
             {/* Modal Dialog (Native full-screen on mobile, centered modal card on desktop) */}
             <motion.div
-                className="relative z-10 w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md bg-[#121212] flex flex-col text-gray-200 sm:rounded-3xl sm:shadow-2xl sm:border sm:border-neutral-800 overflow-hidden"
+                className="relative z-10 w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md bg-[#0a0a0a] flex flex-col text-gray-200 sm:rounded-3xl sm:shadow-2xl sm:border sm:border-neutral-800 overflow-hidden"
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
@@ -157,7 +157,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                 {!record.id.startsWith('untracked-') && (
                     <button
                         onClick={handleDelete}
-                        className="w-full flex items-center justify-center gap-2 bg-[#1f2429] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 bg-[#171717] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
                     >
                         <Trash2 size={16} /> Delete Record
                     </button>
@@ -165,7 +165,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
 
                 {/* ── Start Time Box ── */}
                 <div className="relative border border-[#2a2a2a] rounded-xl pt-4 pb-3 px-3 mt-4 text-center">
-                    <span className="absolute -top-2.5 left-4 bg-[#121212] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Start</span>
+                    <span className="absolute -top-2.5 left-4 bg-[#0a0a0a] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">Start</span>
 
                     <div className="flex items-center justify-center gap-2 mb-3">
                         <span className="text-rose-500 font-bold text-sm tracking-wide">{formatDate(start.toISOString())}</span>
@@ -177,14 +177,14 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                             <button
                                 key={v}
                                 onClick={() => adjustTime('start', v)}
-                                className="flex-1 min-w-[36px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] text-xs font-semibold text-gray-400 active:bg-[#333]"
+                                className="flex-1 min-w-[36px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-400 active:bg-[#333]"
                             >
                                 {v > 0 ? '+' : ''}{v}
                             </button>
                         ))}
                         <button
                             onClick={() => setNow('start')}
-                            className="flex-1 min-w-[48px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] text-xs font-semibold text-gray-300 active:bg-[#333]"
+                            className="flex-1 min-w-[48px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-300 active:bg-[#333]"
                         >
                             Now
                         </button>
@@ -193,7 +193,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
 
                 {/* ── End Time Box ── */}
                 <div className={`relative border border-[#2a2a2a] rounded-xl pt-5 pb-3 px-3 text-center mt-2 ${record.isRunning ? 'opacity-30 pointer-events-none' : ''}`}>
-                    <span className="absolute -top-2.5 left-4 bg-[#121212] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">End</span>
+                    <span className="absolute -top-2.5 left-4 bg-[#0a0a0a] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">End</span>
 
                     <div className="flex items-center justify-center gap-2 mb-3">
                         <span className="text-rose-500 font-bold text-sm tracking-wide">{record.isRunning ? 'Now' : formatDate(end.toISOString())}</span>
@@ -205,14 +205,14 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                             <button
                                 key={v}
                                 onClick={() => adjustTime('end', v)}
-                                className="flex-1 min-w-[36px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] text-xs font-semibold text-gray-400 active:bg-[#333]"
+                                className="flex-1 min-w-[36px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-400 active:bg-[#333]"
                             >
                                 {v > 0 ? '+' : ''}{v}
                             </button>
                         ))}
                         <button
                             onClick={() => setNow('end')}
-                            className="flex-1 min-w-[48px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#1a1a1a] text-xs font-semibold text-gray-300 active:bg-[#333]"
+                            className="flex-1 min-w-[48px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-300 active:bg-[#333]"
                         >
                             Now
                         </button>
@@ -221,11 +221,11 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
 
                 {/* ── Activity Selector (Collapsible Accordion Grid) ── */}
                 <div className="mt-4 space-y-2 pb-6">
-                    <div className="border border-[#2a2a2a] rounded-xl bg-[#151515] overflow-hidden">
+                    <div className="border border-[#2a2a2a] rounded-xl bg-[#141414] overflow-hidden">
                         <button
                             type="button"
                             onClick={() => setIsActivityOpen(!isActivityOpen)}
-                            className="w-full p-3 flex items-center justify-between active:bg-[#1a1a1a] transition-colors"
+                            className="w-full p-3 flex items-center justify-between active:bg-[#171717] transition-colors"
                         >
                             <span className="text-gray-400 text-sm font-medium">Activity</span>
                             <div className="flex items-center gap-2">
@@ -268,7 +268,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                                                     }}
                                                     className={`relative w-full aspect-square rounded-xl flex flex-col items-center justify-center gap-1 shadow-sm transition-all overflow-hidden select-none cursor-pointer ${
                                                         isSelected
-                                                            ? 'ring-4 ring-white ring-offset-2 ring-offset-[#151515] scale-[1.02] z-10'
+                                                            ? 'ring-4 ring-white ring-offset-2 ring-offset-[#141414] scale-[1.02] z-10'
                                                             : 'opacity-85 hover:opacity-100'
                                                     }`}
                                                     style={{ backgroundColor: rt.color }}
@@ -301,7 +301,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                                             }}
                                             className={`relative w-full aspect-square rounded-xl flex flex-col items-center justify-center gap-1 shadow-sm transition-all overflow-hidden select-none cursor-pointer border-2 border-dashed border-neutral-700 bg-neutral-900 text-neutral-300 ${
                                                 activityId === 'untracked'
-                                                    ? 'ring-4 ring-white ring-offset-2 ring-offset-[#151515] scale-[1.02] z-10'
+                                                    ? 'ring-4 ring-white ring-offset-2 ring-offset-[#141414] scale-[1.02] z-10'
                                                     : 'opacity-70 hover:opacity-100'
                                             }`}
                                         >
@@ -326,10 +326,10 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
             </div>
 
             {/* ── Bottom Save Button ── */}
-            <div className="p-4 bg-[#121212] border-t border-[#1e1e1e] flex-shrink-0">
+            <div className="p-4 bg-[#0a0a0a] border-t border-[#1e1e1e] flex-shrink-0">
                 <button
                     onClick={handleSave}
-                    className="w-full bg-[#1e2328] hover:bg-[#2c333a] py-4 rounded-[14px] text-gray-300 font-bold text-sm tracking-widest uppercase active:scale-[0.98] transition-all cursor-pointer"
+                    className="w-full bg-[#1c1c1c] hover:bg-[#2a2a2a] py-4 rounded-[14px] text-gray-300 font-bold text-sm tracking-widest uppercase active:scale-[0.98] transition-all cursor-pointer"
                 >
                     Save
                 </button>

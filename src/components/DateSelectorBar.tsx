@@ -87,7 +87,7 @@ export default function DateSelectorBar({
 
     return (
         <div
-            className="fixed left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-[rgba(243,244,246,0.95)] dark:bg-[rgba(17,24,39,0.95)] backdrop-blur-md border-t border-gray-200 dark:border-gray-800"
+            className="fixed left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-[rgba(243,244,246,0.95)] dark:bg-[rgba(23,23,23,0.95)] backdrop-blur-md border-t border-gray-200 dark:border-gray-800"
             style={{ bottom: 'calc(58px + env(safe-area-inset-bottom))' }}
         >
             <div className="flex items-center">
