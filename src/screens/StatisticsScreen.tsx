@@ -167,7 +167,7 @@ export default function StatisticsScreen() {
     }, [filteredRecords, activeDetailActivity]);
 
     return (
-        <div className="flex flex-col min-h-screen pt-4 pb-[136px]">
+        <div className="flex flex-col min-h-screen pt-4 pb-[168px]">
             {stats.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
                     <div className="w-20 h-20 rounded-3xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
@@ -182,7 +182,7 @@ export default function StatisticsScreen() {
                 <div className="px-4">
                     {/* Doughnut Chart */}
                     <div className="relative mt-8 mb-6 h-56">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={224}>
                             <PieChart>
                                 <Pie
                                     data={stats}

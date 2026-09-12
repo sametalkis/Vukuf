@@ -295,7 +295,7 @@ export default function RecordsScreen() {
     }, [visibleRecords, showUntracked, viewMode, selectedDate, tick]);
 
     return (
-        <div className="flex flex-col min-h-screen pt-4 pb-[136px]">
+        <div className="flex flex-col min-h-screen pt-4 pb-[168px]">
             {/* Content */}
             {groups.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center pt-20">

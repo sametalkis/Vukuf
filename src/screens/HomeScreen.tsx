@@ -94,7 +94,13 @@ export default function HomeScreen() {
                 onClick={openAddModal}
                 whileTap={{ scale: 0.9 }}
                 whileHover={{ scale: 1.05 }}
-                className="fixed bottom-20 right-4 w-14 h-14 bg-primary-600 dark:bg-primary-500 text-white rounded-2xl shadow-xl flex items-center justify-center z-20"
+                style={{
+                    backgroundColor: 'var(--primary, #ff9100)',
+                    color: 'var(--primary-contrast, #ffffff)',
+                    bottom: 'calc(80px + env(safe-area-inset-bottom, 14px))',
+                    boxShadow: '0 8px 24px var(--primary-soft, rgba(255, 145, 0, 0.35))',
+                }}
+                className="fixed right-4 w-14 h-14 rounded-2xl shadow-xl flex items-center justify-center z-20"
             >
                 <Plus size={28} />
             </motion.button>

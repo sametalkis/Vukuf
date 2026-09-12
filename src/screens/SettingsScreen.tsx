@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react';
-import { Moon, Sun, Download, Upload, Trash2, AlertTriangle, Check, Clock } from 'lucide-react';
+import { Moon, Sun, Download, Upload, Trash2, AlertTriangle, Check, Clock, Palette } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/useStore';
+import { ACCENT_PRESETS } from '../utils/accentColor';
 
 export default function SettingsScreen() {
     const { theme, toggleTheme } = useTheme();
     const {
         recordTypes, records, runningRecord,
         importData, importCSV, importBackup, clearAllData,
-        showUntrackedTime, toggleUntrackedTime
+        showUntrackedTime, toggleUntrackedTime,
+        accentColor, setAccentColor
     } = useStore();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -209,6 +211,74 @@ export default function SettingsScreen() {
                             >
                                 <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300 ${showUntrackedTime ? 'left-6' : 'left-0.5'}`} />
                             </button>
+                        </div>
+
+                        {/* Accent Color */}
+                        <div className="px-4 py-4 border-t border-gray-100 dark:border-gray-800 transition-colors">
+                            <div className="flex items-center gap-4 mb-3">
+                                <div
+                                    className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 transition-colors"
+                                    style={{
+                                        backgroundColor: 'var(--primary-soft, rgba(255, 145, 0, 0.15))',
+                                        color: 'var(--primary, #ff9100)'
+                                    }}
+                                >
+                                    <Palette size={20} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Accent Color</p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Customize buttons, icons & active slider</p>
+                                </div>
+                            </div>
+
+                            {/* Palette Swatches */}
+                            <div className="accent-picker pl-14">
+                                {ACCENT_PRESETS.map((opt) => {
+                                    const isSelected = (accentColor || '#ff9100').toLowerCase() === opt.hex.toLowerCase();
+                                    return (
+                                        <button
+                                            key={opt.id}
+                                            type="button"
+                                            title={opt.name}
+                                            aria-label={opt.name}
+                                            className={`accent-picker__item${isSelected ? ' accent-picker__item--active' : ''}`}
+                                            style={{ color: opt.hex }}
+                                            onClick={() => setAccentColor(opt.hex)}
+                                        >
+                                            <span className="accent-picker__swatch" style={{ backgroundColor: opt.hex }} />
+                                        </button>
+                                    );
+                                })}
+
+                                {/* Custom Color Picker */}
+                                {(() => {
+                                    const isCustom = !ACCENT_PRESETS.some(
+                                        p => p.hex.toLowerCase() === (accentColor || '').toLowerCase()
+                                    );
+                                    return (
+                                        <label
+                                            className={`accent-picker__custom-wrapper${isCustom ? ' accent-picker__custom-wrapper--active' : ''}`}
+                                            title="Custom Color Picker"
+                                            style={{ color: isCustom ? accentColor : '#a3a3a3' }}
+                                        >
+                                            <span
+                                                className="accent-picker__custom-swatch"
+                                                style={{
+                                                    background: isCustom
+                                                        ? accentColor
+                                                        : 'conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)'
+                                                }}
+                                            />
+                                            <input
+                                                type="color"
+                                                className="accent-picker__custom-input"
+                                                value={accentColor || '#ff9100'}
+                                                onChange={(e) => setAccentColor(e.target.value)}
+                                            />
+                                        </label>
+                                    );
+                                })()}
+                            </div>
                         </div>
                     </div>
                 </section>

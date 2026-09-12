@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
@@ -5,6 +6,8 @@ import { useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import BottomNav from './components/BottomNav';
 import Layout from './components/Layout';
+import { useStore } from './store/useStore';
+import { applyAccentColor, DEFAULT_ACCENT_COLOR } from './utils/accentColor';
 
 import HomeScreen from './screens/HomeScreen';
 import RecordsScreen from './screens/RecordsScreen';
@@ -47,6 +50,12 @@ function AnimatedRoutes() {
 }
 
 function App() {
+  const accentColor = useStore((s) => s.accentColor);
+
+  useEffect(() => {
+    applyAccentColor(accentColor || DEFAULT_ACCENT_COLOR);
+  }, [accentColor]);
+
   return (
     <ThemeProvider>
       {/* Mobile viewport container */}

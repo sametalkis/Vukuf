@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import type { RecordType, Record, RunningRecord } from '../types';
+import { DEFAULT_ACCENT_COLOR, applyAccentColor } from '../utils/accentColor';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function now() {
@@ -19,6 +20,7 @@ interface TimeTrackerStore {
     records: Record[];
     runningRecord: RunningRecord | null;
     showUntrackedTime: boolean;
+    accentColor: string;
 
     // RecordType actions
     addRecordType: (data: Omit<RecordType, 'id'>) => void;
@@ -41,6 +43,7 @@ interface TimeTrackerStore {
 
     // Settings
     toggleUntrackedTime: () => void;
+    setAccentColor: (color: string) => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -51,6 +54,7 @@ export const useStore = create<TimeTrackerStore>()(
             records: [],
             runningRecord: null,
             showUntrackedTime: true,
+            accentColor: DEFAULT_ACCENT_COLOR,
 
             // ── RecordType CRUD ──
             addRecordType: (data) => {
@@ -458,10 +462,19 @@ export const useStore = create<TimeTrackerStore>()(
                 });
             },
 
+            setAccentColor: (color: string) => {
+                set({ accentColor: color });
+                applyAccentColor(color);
+            },
+
         }),
         {
             name: 'simple-time-tracker',
             storage: createJSONStorage(() => localStorage),
+            onRehydrateStorage: () => (state) => {
+                const color = state?.accentColor || DEFAULT_ACCENT_COLOR;
+                applyAccentColor(color);
+            },
         }
     )
 );

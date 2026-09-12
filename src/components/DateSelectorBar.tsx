@@ -87,14 +87,17 @@ export default function DateSelectorBar({
 
     return (
         <div
-            className="fixed left-1/2 -translate-x-1/2 w-full max-w-md z-40 bg-[rgba(243,244,246,0.95)] dark:bg-[rgba(23,23,23,0.95)] backdrop-blur-md border-t border-gray-200 dark:border-gray-800"
-            style={{ bottom: 'calc(58px + env(safe-area-inset-bottom))' }}
+            className="fixed left-1/2 -translate-x-1/2 z-40 bg-white/90 dark:bg-[#141414]/90 backdrop-blur-xl border border-black/5 dark:border-white/10 shadow-xl rounded-2xl overflow-hidden"
+            style={{
+                width: 'min(92vw, 420px)',
+                bottom: 'calc(80px + env(safe-area-inset-bottom, 14px))',
+            }}
         >
             <div className="flex items-center">
                 {/* Horizontal Date Scroller */}
                 <div
                     ref={scrollContainerRef}
-                    className="flex-1 flex items-center gap-1.5 px-3 py-2 overflow-x-auto no-scrollbar"
+                    className="flex-1 flex items-center gap-1.5 px-2.5 py-2 overflow-x-auto no-scrollbar"
                 >
                     {viewMode === 'all' ? (
                         <div className="flex-1 text-center text-sm font-semibold text-gray-500 py-3">
@@ -105,14 +108,29 @@ export default function DateSelectorBar({
                             <button
                                 key={idx}
                                 onClick={() => setSelectedDate(item.date)}
-                                className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[3.25rem] px-3 py-2 rounded-xl transition-colors ${item.isSelected
-                                    ? 'bg-gray-800 dark:bg-gray-700 text-white shadow-sm scale-105'
-                                    : 'text-gray-500 hover:bg-gray-200/50 dark:hover:bg-gray-800/50'
+                                className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[3.25rem] px-3 py-2 rounded-xl transition-all ${item.isSelected
+                                    ? 'shadow-md scale-105 font-bold'
+                                    : 'text-gray-500 hover:bg-gray-200/50 dark:hover:bg-neutral-800/50'
                                     }`}
+                                style={item.isSelected ? {
+                                    backgroundColor: 'var(--primary, #ff9100)',
+                                    color: 'var(--primary-contrast, #ffffff)',
+                                    boxShadow: '0 4px 14px var(--primary-soft, rgba(255, 145, 0, 0.25))'
+                                } : undefined}
                             >
-                                {item.monthLabel && <span className="text-[9px] uppercase font-bold tracking-wider opacity-90 text-gray-300">{item.monthLabel}</span>}
-                                {item.subLabel && <span className={`text-[10px] uppercase font-bold tracking-wider mb-0.5 opacity-80 ${item.isSelected ? 'text-gray-300' : ''}`}>{item.subLabel}</span>}
-                                <span className={`text-base font-bold leading-none ${!item.isSelected ? 'text-gray-800 dark:text-gray-200' : ''}`}>{item.label}</span>
+                                {item.monthLabel && (
+                                    <span className={`text-[9px] uppercase font-bold tracking-wider opacity-90 ${item.isSelected ? 'opacity-90' : 'text-gray-400'}`}>
+                                        {item.monthLabel}
+                                    </span>
+                                )}
+                                {item.subLabel && (
+                                    <span className={`text-[10px] uppercase font-bold tracking-wider mb-0.5 ${item.isSelected ? 'opacity-90' : 'text-gray-400'}`}>
+                                        {item.subLabel}
+                                    </span>
+                                )}
+                                <span className={`text-base font-bold leading-none ${!item.isSelected ? 'text-gray-800 dark:text-gray-200' : ''}`}>
+                                    {item.label}
+                                </span>
                             </button>
                         ))
                     )}
