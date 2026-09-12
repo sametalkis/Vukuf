@@ -39,8 +39,10 @@ export default {
                     fail('creation_denied', 403);
                 }
                 if (![input.vaultId, input.deviceId].every(validId) || !validHash(input.tokenHash) || !validHash(input.recoveryHash)) fail('invalid_identity');
+                const clientIp = req.headers.get('CF-Connecting-IP');
+                const isLocal = !clientIp || clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost';
                 const registry = env.SYNC_VAULTS.get(env.SYNC_VAULTS.idFromName('registry'));
-                await registry.reserve(input.vaultId, await hash(req.headers.get('CF-Connecting-IP') ?? 'local'));
+                await registry.reserve(input.vaultId, isLocal ? 'local' : await hash(clientIp));
                 const stub = env.SYNC_VAULTS.get(env.SYNC_VAULTS.idFromName(input.vaultId));
                 await stub.initialize(input.vaultId, input.deviceId, input.tokenHash, input.recoveryHash);
                 return json({ vaultId: input.vaultId, keyVersion: 1 });
@@ -70,7 +72,7 @@ export class SyncVault extends DurableObject<Env> {
     }
     async reserve(id: string, ip: string): Promise<void> {
         if (this.sql.exec('SELECT id FROM registry WHERE id = ?', id).toArray().length) return;
-        if (ip !== await hash('local')) this.limit(`create:${ip}`, 20, 86400000);
+        if (ip !== 'local' && ip !== await hash('local')) this.limit(`create:${ip}`, 20, 86400000);
         if (this.sql.exec<{ n: number }>('SELECT COUNT(*) AS n FROM registry').one().n >= 50) fail('installation_quota', 507);
         this.sql.exec('INSERT INTO registry VALUES (?)', id);
     }
@@ -101,8 +103,9 @@ export class SyncVault extends DurableObject<Env> {
             const now = Date.now();
             this.sql.exec('DELETE FROM chunks WHERE upload IN (SELECT id FROM uploads WHERE expires < ? AND done = 0)', now);
             this.sql.exec('DELETE FROM uploads WHERE expires < ? AND done = 0', now);
-            this.sql.exec('DELETE FROM invites WHERE expires < ?', now);
-            this.limit(`ip:${await hash(req.headers.get('CF-Connecting-IP') ?? 'local')}`, 180);
+            const clientIp = req.headers.get('CF-Connecting-IP');
+            const isLocal = !clientIp || clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === 'localhost';
+            if (!isLocal && clientIp) this.limit(`ip:${await hash(clientIp)}`, 180);
             const inviteMatch = path.match(/^\/invites\/([\w-]+)(\/claim)?$/);
             if (inviteMatch && (req.method === 'GET' || inviteMatch[2])) {
                 this.limit('invite-attempts', 30);

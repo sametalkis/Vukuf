@@ -21,6 +21,9 @@ export const completed = (tx: IDBTransaction): Promise<void> => new Promise((res
     tx.oncomplete = () => resolve(); tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Yerel kayıt tamamlanamadı.'));
 });
 export function database(): Promise<IDBDatabase> {
+    if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+        navigator.storage.persist().catch(() => undefined);
+    }
     if (!connection) connection = new Promise((resolve, reject) => {
         const req = indexedDB.open('simple-time-tracker-db', 2);
         req.onupgradeneeded = () => {

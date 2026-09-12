@@ -364,3 +364,7 @@ export async function recover(file: string, code: string) {
         await setMeta('credentials', credential); await setMeta('cursor', 0); await cycle();
     });
 }
+
+if (typeof window !== 'undefined') {
+    (window as unknown as Record<string, unknown>).__STT_SYNC__ = { syncNow, createInvite, joinVault, recoveryPackage, recover, deleteVault, getSyncState };
+}

@@ -509,3 +509,7 @@ export const useStore = create<TimeTrackerStore>()(
         }
     )
 );
+
+if (typeof window !== 'undefined') {
+    (window as unknown as { __STT_STORE__?: typeof useStore }).__STT_STORE__ = useStore;
+}
