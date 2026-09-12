@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 import type { RecordType, Record, RunningRecord } from '../types';
 import { DEFAULT_ACCENT_COLOR, applyAccentColor } from '../utils/accentColor';
-import { idbStorage } from '../utils/idbStorage';
+import { syncStorage } from '../sync/storage';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function now() {
@@ -108,7 +108,7 @@ export const useStore = create<TimeTrackerStore>()(
                     if (runningRecord.recordTypeId !== 'untracked' || duration >= 60) {
                         if (duration > 0 || runningRecord.recordTypeId !== 'untracked') {
                             const completedRecord: Record = {
-                                id: uuidv4(),
+                                id: runningRecord.id,
                                 recordTypeId: runningRecord.recordTypeId,
                                 startTime: runningRecord.startTime,
                                 endTime,
@@ -139,7 +139,7 @@ export const useStore = create<TimeTrackerStore>()(
                 if (runningRecord.recordTypeId !== 'untracked' || duration >= 60) {
                     if (duration > 0 || runningRecord.recordTypeId !== 'untracked') {
                         const completedRecord: Record = {
-                            id: uuidv4(),
+                            id: runningRecord.id,
                             recordTypeId: runningRecord.recordTypeId,
                             startTime: runningRecord.startTime,
                             endTime,
@@ -501,7 +501,7 @@ export const useStore = create<TimeTrackerStore>()(
         }),
         {
             name: 'simple-time-tracker',
-            storage: createJSONStorage(() => idbStorage),
+            storage: createJSONStorage(() => syncStorage),
             onRehydrateStorage: () => (state) => {
                 const color = state?.accentColor || DEFAULT_ACCENT_COLOR;
                 applyAccentColor(color);

@@ -14,6 +14,7 @@ import RecordsScreen from './screens/RecordsScreen';
 import StatisticsScreen from './screens/StatisticsScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { useActivityReminder } from './hooks/useActivityReminder';
+import SyncGate from './components/SyncGate';
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -62,6 +63,7 @@ function App() {
 
   return (
     <ThemeProvider>
+      <SyncGate>
       {/* Mobile viewport container */}
       <div className="flex justify-center min-h-screen bg-gray-200 dark:bg-gray-950">
         <div className="relative w-full max-w-md bg-gray-100 dark:bg-gray-950 shadow-2xl">
@@ -71,6 +73,7 @@ function App() {
           <BottomNav />
         </div>
       </div>
+      </SyncGate>
     </ThemeProvider>
   );
 }

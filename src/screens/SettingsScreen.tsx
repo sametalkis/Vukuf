@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useStore } from '../store/useStore';
 import { ACCENT_PRESETS } from '../utils/accentColor';
 import { checkNotificationPermission, requestNotificationPermission, sendActivityNotification } from '../utils/notifications';
+import SyncPanel from '../components/SyncPanel';
 
 export default function SettingsScreen() {
     const { theme, toggleTheme } = useTheme();
@@ -469,6 +470,8 @@ export default function SettingsScreen() {
                         )}
                     </div>
                 </section>
+
+                <SyncPanel />
 
                 {/* Data Management */}
                 <section className="space-y-2">

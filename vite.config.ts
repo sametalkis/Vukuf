@@ -1,13 +1,26 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: { proxy: { '/api': {
+    target: 'http://127.0.0.1:8787',
+    changeOrigin: true,
+    configure(proxy) {
+      proxy.on('proxyReq', (request, incoming) => {
+        // Dev-only bridge. Production still requires the exact request origin.
+        if (incoming.headers.origin) request.setHeader('Origin', 'http://127.0.0.1:8787');
+      });
+    },
+  } } },
   plugins: [
     react(),
+    basicSsl(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: { navigateFallbackDenylist: [/^\/api\//] },
       includeAssets: ['favicon.svg', 'icon.svg'],
       manifest: {
         name: 'Simple Time Tracker',

@@ -11,6 +11,7 @@ import ActivityDetailModal from '../components/ActivityDetailModal';
 import StatisticsExportModal from '../components/StatisticsExportModal';
 import EditRecordScreen from '../components/EditRecordScreen';
 import type { Record as TimeRecord } from '../types';
+import { useSyncStatus } from '../sync/engine';
 
 const RADIAN = Math.PI / 180;
 const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload }: any) => {
@@ -57,6 +58,7 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
 }
 
 export default function StatisticsScreen() {
+    const syncStatus = useSyncStatus();
     const { records, recordTypes, runningRecord } = useStore();
 
     // View mode constraints
@@ -195,6 +197,7 @@ export default function StatisticsScreen() {
 
     return (
         <div className="flex flex-col min-h-screen pt-4 pb-[168px]">
+            {(syncStatus.conflicts.length > 0 || syncStatus.activeSessions.length > 1) && <p className="mx-4 mb-3 text-sm text-amber-700 dark:text-amber-300">Eşitlemede incelenmesi gereken kayıtlar var. Toplamlar henüz kesinleşmemiş olabilir. Ayarlar → Cihazlar ve Eşitleme bölümünü inceleyin.</p>}
             {stats.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
                     <div className="w-20 h-20 rounded-3xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">

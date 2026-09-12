@@ -1,9 +1,16 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "timetracker",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-09-11",
   "assets": {
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "SYNC_VAULTS", "class_name": "SyncVault" }]
+  },
+  "migrations": [{ "tag": "sync-v1", "new_sqlite_classes": ["SyncVault"] }]
 }
