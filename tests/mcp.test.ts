@@ -62,15 +62,15 @@ describe('MCP Formatting & Calculations', () => {
                 {
                     id: 'rec-1',
                     recordTypeId: 'act-1',
-                    startTime: new Date(Date.now() - 3600000).toISOString(),
-                    endTime: new Date().toISOString(),
+                    startTime: '2026-05-15T10:00:00.000Z',
+                    endTime: '2026-05-15T11:00:00.000Z',
                     duration: 3600,
                 },
                 {
                     id: 'rec-2',
                     recordTypeId: 'act-2',
-                    startTime: new Date(Date.now() - 1800000).toISOString(),
-                    endTime: new Date().toISOString(),
+                    startTime: '2026-05-15T14:00:00.000Z',
+                    endTime: '2026-05-15T14:30:00.000Z',
                     duration: 1800,
                 },
             ],
@@ -79,7 +79,7 @@ describe('MCP Formatting & Calculations', () => {
             activeSessions: [],
         };
 
-        const summary = computeSummary(projection, 'today');
+        const summary = computeSummary(projection, 'today', '2026-05-15');
         expect(summary.totalSeconds).toBe(5400); // 1.5 hours
         expect(summary.sessionCount).toBe(2);
         expect(summary.breakdown).toHaveLength(2);
