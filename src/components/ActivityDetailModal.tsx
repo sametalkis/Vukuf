@@ -27,7 +27,7 @@ import type { ViewMode } from './DateSelectorBar';
 import DynamicIcon from './DynamicIcon';
 import ActivityHeatmap from './ActivityHeatmap';
 import { getContrastColor } from '../utils/colors';
-import { formatDuration } from '../utils/time';
+import { formatDuration, formatPercent } from '../utils/time';
 import { useStore } from '../store/useStore';
 
 interface ActivityDetailModalProps {
@@ -188,7 +188,7 @@ export default function ActivityDetailModal({
                         color: act?.color || '#9ca3af',
                         icon: act?.icon || 'Clock',
                         count,
-                        percent: total > 0 ? Math.round((count / total) * 100) : 0,
+                        percent: total > 0 ? (count / total) * 100 : 0,
                     };
                 })
                 .sort((a, b) => b.count - a.count);
@@ -280,7 +280,7 @@ export default function ActivityDetailModal({
             return {
                 ...d,
                 heightPercent,
-                percentOfTotal: totalDuration > 0 ? Math.round((d.duration / totalDuration) * 100) : 0,
+                percentOfTotal: totalDuration > 0 ? (d.duration / totalDuration) * 100 : 0,
                 formatted: formatDuration(d.duration),
                 avgDuration: avgDur,
                 avgFormatted: formatDuration(avgDur),
@@ -581,7 +581,7 @@ export default function ActivityDetailModal({
                                         {periodTitle}
                                     </span>
                                     <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-                                        {Math.round(activity.percent)}% of total
+                                        {formatPercent(activity.percent)} of total
                                     </span>
                                 </div>
                             </div>
@@ -700,7 +700,7 @@ export default function ActivityDetailModal({
                                                 {habitTransitions.topPreceding.name}
                                             </p>
                                             <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                                                %{habitTransitions.topPreceding.percent} ({habitTransitions.topPreceding.count}x)
+                                                {formatPercent(habitTransitions.topPreceding.percent)} ({habitTransitions.topPreceding.count}x)
                                             </span>
                                         </>
                                     ) : (
@@ -746,7 +746,7 @@ export default function ActivityDetailModal({
                                                 {habitTransitions.topSucceeding.name}
                                             </p>
                                             <span className="text-[10px] font-medium text-sky-600 dark:text-sky-400">
-                                                %{habitTransitions.topSucceeding.percent} ({habitTransitions.topSucceeding.count}x)
+                                                {formatPercent(habitTransitions.topSucceeding.percent)} ({habitTransitions.topSucceeding.count}x)
                                             </span>
                                         </>
                                     ) : (
@@ -774,7 +774,7 @@ export default function ActivityDetailModal({
                                                 <span className="font-semibold text-gray-700 dark:text-gray-300">
                                                     {p.name}
                                                 </span>
-                                                <span className="text-gray-400">%{p.percent} ({p.count}x)</span>
+                                                <span className="text-gray-400">{formatPercent(p.percent)} ({p.count}x)</span>
                                             </div>
                                         ))}
                                     </div>
@@ -857,7 +857,7 @@ export default function ActivityDetailModal({
                                                             ? 'opacity-100 shadow-sm'
                                                             : 'opacity-80 hover:opacity-100'
                                                     }`}
-                                                    title={`${d.label}: Toplam ${d.formatted} (${d.avgFormatted}/gün) - %${d.percentOfTotal}`}
+                                                    title={`${d.label}: Toplam ${d.formatted} (${d.avgFormatted}/gün) - ${formatPercent(d.percentOfTotal)}`}
                                                 />
                                             </div>
 

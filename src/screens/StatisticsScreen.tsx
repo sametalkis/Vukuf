@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useStore } from '../store/useStore';
-import { formatDuration, splitRecordByDays } from '../utils/time';
+import { formatDuration, formatPercent, splitRecordByDays } from '../utils/time';
 import DateSelectorBar from '../components/DateSelectorBar';
 import type { ViewMode } from '../components/DateSelectorBar';
 import { Share2 } from 'lucide-react';
@@ -29,13 +29,9 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, pay
     );
 };
 
-function formatPercent(n: number): string {
-    return `${Math.round(n)}%`;
-}
-
 interface CustomTooltipProps {
     active?: boolean;
-    payload?: { name: string; value: number; payload: { color: string } }[];
+    payload?: { name: string; value: number; payload: { color: string; percent?: number } }[];
 }
 
 interface StatisticsExportSnapshot {
@@ -47,10 +43,15 @@ interface StatisticsExportSnapshot {
 
 function CustomTooltip({ active, payload }: CustomTooltipProps) {
     if (!active || !payload?.length) return null;
+    const item = payload[0];
+    const percent = item.payload?.percent;
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl px-3 py-2 shadow-lg border border-gray-100 dark:border-gray-700">
-            <p className="text-xs font-bold text-gray-800 dark:text-gray-200">{payload[0].name}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{formatDuration(payload[0].value)}</p>
+            <p className="text-xs font-bold text-gray-800 dark:text-gray-200">{item.name}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                {formatDuration(item.value)}
+                {typeof percent === 'number' && ` • ${formatPercent(percent)}`}
+            </p>
         </div>
     );
 }

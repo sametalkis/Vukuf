@@ -11,6 +11,21 @@ export function formatDuration(seconds: number): string {
     return `${m}m`;
 }
 
+/**
+ * Formats a percentage number with intelligent decimal precision:
+ * - 0 => '0%'
+ * - < 0.1 (and > 0) => '<0.1%'
+ * - 0.4 => '0.4%'
+ * - 1.25 => '1.3%'
+ * - 15.0 => '15%'
+ * - 15.4 => '15.4%'
+ */
+export function formatPercent(n: number): string {
+    if (!n || n <= 0) return '0%';
+    if (n < 0.1) return '<0.1%';
+    return `${parseFloat(n.toFixed(1))}%`;
+}
+
 export function formatTime(iso: string): string {
     return new Date(iso).toLocaleTimeString([], {
         hour: '2-digit',
