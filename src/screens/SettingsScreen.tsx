@@ -16,7 +16,8 @@ export default function SettingsScreen() {
         notificationsEnabled, toggleNotifications,
         notificationMinutes, setNotificationMinutes,
         notificationRepeat, toggleNotificationRepeat,
-        notificationSound, toggleNotificationSound
+        notificationSound, toggleNotificationSound,
+        setActiveInquiry
     } = useStore();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -35,13 +36,38 @@ export default function SettingsScreen() {
         if (checkNotificationPermission() !== 'granted') {
             const granted = await requestNotificationPermission();
             setPermissionStatus(checkNotificationPermission());
-            if (!granted) return;
+            if (!granted) {
+                // If web notification permission not granted, show in-app inquiry test
+                setActiveInquiry({
+                    recordTypeId: 'test',
+                    activityName: 'Kodlama',
+                    activityColor: accentColor || '#ff9100',
+                    activityIcon: 'code',
+                    elapsedMinutes: 45,
+                    timeStr: '45 dakika',
+                    promptedAt: new Date().toISOString()
+                });
+                return;
+            }
         }
         sendActivityNotification(
-            '⏰ Test Bildirimi',
-            'Harika! Bildirimler başarıyla çalışıyor.',
-            notificationSound
+            '⏰ Hâlâ "Kodlama" mı yapıyorsunuz?',
+            '"Kodlama" aktivitesi 45 dakikadır devam ediyor. Hâlâ bu aktiviteyi yapıyor musunuz?',
+            notificationSound,
+            [
+                { action: 'stop', title: '⏹️ Hayır, Durdur' },
+                { action: 'continue', title: '▶️ Evet, Devam Et' }
+            ]
         );
+        setActiveInquiry({
+            recordTypeId: 'test',
+            activityName: 'Kodlama',
+            activityColor: accentColor || '#ff9100',
+            activityIcon: 'code',
+            elapsedMinutes: 45,
+            timeStr: '45 dakika',
+            promptedAt: new Date().toISOString()
+        });
     };
 
     const [importStatus, setImportStatus] = useState<{
@@ -357,8 +383,8 @@ export default function SettingsScreen() {
                                     <Bell size={20} />
                                 </div>
                                 <div className="text-left">
-                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Aktivite Süre Uyarısı</p>
-                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Aynı aktivitede uzun süre kalınca uyar</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Aktivite Kontrol Bildirimi</p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Hâlâ bu aktiviteyi yapıp yapmadığınızı sorar</p>
                                 </div>
                             </div>
                             <button
@@ -375,7 +401,7 @@ export default function SettingsScreen() {
                             <>
                                 <div className="px-4 py-4 space-y-2.5">
                                     <div className="flex items-center justify-between">
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Hatırlatma Süresi</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Kontrol Süresi</p>
                                         <span
                                             className="text-xs font-bold px-2 py-0.5 rounded-md"
                                             style={{ backgroundColor: 'var(--primary-soft, rgba(255, 145, 0, 0.15))', color: 'var(--primary, #ff9100)' }}
@@ -416,7 +442,7 @@ export default function SettingsScreen() {
                                         </div>
                                         <div className="text-left">
                                             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Periyodik Tekrarla</p>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Her {notificationMinutes} dakikada bir hatırlat</p>
+                                            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Durdurulana kadar her {notificationMinutes} dakikada bir tekrar sor</p>
                                         </div>
                                     </div>
                                     <button

@@ -79,19 +79,31 @@ export function playNotificationChime() {
 /**
  * Dispatches a Web Notification using ServiceWorker if available, or native Notification fallback.
  */
-export async function sendActivityNotification(title: string, body: string, playSound = true) {
+export async function sendActivityNotification(
+    title: string,
+    body: string,
+    playSound = true,
+    actions?: { action: string; title: string }[]
+) {
     if (checkNotificationPermission() !== 'granted') return;
 
     if (playSound) {
         playNotificationChime();
     }
 
-    const options: NotificationOptions & { vibrate?: number[] } = {
+    const options: NotificationOptions & {
+        vibrate?: number[];
+        actions?: { action: string; title: string }[];
+    } = {
         body,
         icon: '/favicon.svg',
         badge: '/favicon.svg',
         tag: 'simple-time-tracker-reminder',
         vibrate: [200, 100, 200],
+        actions: actions || [
+            { action: 'stop', title: '⏹️ Hayır, Durdur' },
+            { action: 'continue', title: '▶️ Evet, Devam Et' },
+        ],
     };
 
     try {

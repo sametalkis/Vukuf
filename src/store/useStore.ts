@@ -14,6 +14,16 @@ function durationSeconds(start: string, end: string): number {
     return Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000);
 }
 
+export interface ActiveInquiry {
+    recordTypeId: string;
+    activityName: string;
+    activityColor?: string;
+    activityIcon?: string;
+    elapsedMinutes: number;
+    timeStr: string;
+    promptedAt: string;
+}
+
 // ─── Store Interface ──────────────────────────────────────────────────────────
 interface TimeTrackerStore {
     // State
@@ -23,11 +33,12 @@ interface TimeTrackerStore {
     showUntrackedTime: boolean;
     accentColor: string;
 
-    // Notification settings
+    // Notification settings & Activity Inquiry
     notificationsEnabled: boolean;
     notificationMinutes: number;
     notificationRepeat: boolean;
     notificationSound: boolean;
+    activeInquiry: ActiveInquiry | null;
 
     // RecordType actions
     addRecordType: (data: Omit<RecordType, 'id'>) => void;
@@ -48,13 +59,16 @@ interface TimeTrackerStore {
     importBackup: (text: string) => { imported: number; activities: number; skipped: number };
     clearAllData: () => void;
 
-    // Settings
+    // Settings & Inquiry actions
     toggleUntrackedTime: () => void;
     setAccentColor: (color: string) => void;
     toggleNotifications: () => void;
     setNotificationMinutes: (mins: number) => void;
     toggleNotificationRepeat: () => void;
     toggleNotificationSound: () => void;
+    setActiveInquiry: (inquiry: ActiveInquiry | null) => void;
+    dismissInquiry: () => void;
+    confirmInquiryStop: () => void;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -70,6 +84,7 @@ export const useStore = create<TimeTrackerStore>()(
             notificationMinutes: 30,
             notificationRepeat: true,
             notificationSound: true,
+            activeInquiry: null,
 
             // ── RecordType CRUD ──
             addRecordType: (data) => {
@@ -93,6 +108,7 @@ export const useStore = create<TimeTrackerStore>()(
                     // Stop running record if it was this type
                     runningRecord:
                         s.runningRecord?.recordTypeId === id ? null : s.runningRecord,
+                    activeInquiry: s.activeInquiry?.recordTypeId === id ? null : s.activeInquiry,
                 }));
             },
 
@@ -125,7 +141,7 @@ export const useStore = create<TimeTrackerStore>()(
                     recordTypeId,
                     startTime,
                 };
-                set({ runningRecord: newRunning });
+                set({ runningRecord: newRunning, activeInquiry: null });
             },
 
             stopTimer: () => {
@@ -154,7 +170,7 @@ export const useStore = create<TimeTrackerStore>()(
                     newRunning = { id: uuidv4(), recordTypeId: 'untracked', startTime: endTime };
                 }
 
-                set({ records: updatedRecords, runningRecord: newRunning });
+                set({ records: updatedRecords, runningRecord: newRunning, activeInquiry: null });
             },
 
             // ── Record CRUD ──
@@ -498,10 +514,29 @@ export const useStore = create<TimeTrackerStore>()(
                 set((s) => ({ notificationSound: !s.notificationSound }));
             },
 
+            setActiveInquiry: (inquiry) => {
+                set({ activeInquiry: inquiry });
+            },
+
+            dismissInquiry: () => {
+                set({ activeInquiry: null });
+            },
+
+            confirmInquiryStop: () => {
+                get().stopTimer();
+                set({ activeInquiry: null });
+            },
+
         }),
         {
             name: 'simple-time-tracker',
             storage: createJSONStorage(() => idbStorage),
+            partialize: (state) => {
+                // Keep activeInquiry out of persistent storage
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { activeInquiry, ...rest } = state;
+                return rest;
+            },
             onRehydrateStorage: () => (state) => {
                 const color = state?.accentColor || DEFAULT_ACCENT_COLOR;
                 applyAccentColor(color);
