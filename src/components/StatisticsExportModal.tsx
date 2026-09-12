@@ -2,8 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, Share2, X, Loader2, Check, Clock } from 'lucide-react';
-import { toPng, toBlob } from 'html-to-image';
-import { PieChart, Pie, Cell } from 'recharts';
+import { toPng } from 'html-to-image';
 import type { Record as TimeRecord, RecordType, RunningRecord } from '../types';
 import type { ViewMode } from './DateSelectorBar';
 import { formatDuration } from '../utils/time';
@@ -24,27 +23,111 @@ interface StatisticsExportModalProps {
         percent: number;
     }[];
     totalDuration: number;
-    records: TimeRecord[];
-    recordTypes: RecordType[];
-    runningRecord: RunningRecord | null;
+    records?: TimeRecord[];
+    recordTypes?: RecordType[];
+    runningRecord?: RunningRecord | null;
 }
 
-const RADIAN = Math.PI / 180;
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload }: any) => {
-    if (payload.percent < 4) return null; // Dilim çok küçükse ikonu gizle
+// Convert data URL directly to Blob without re-running html-to-image
+async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+    const res = await fetch(dataUrl);
+    return await res.blob();
+}
 
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+// 100% Native SVG Donut Chart (instant, zero async delay, no foreignObject, never hangs html-to-image)
+function SvgDonutChart({
+    stats,
+    totalDuration,
+    isDark,
+}: {
+    stats: { id: string; name: string; color: string; percent: number; duration: number }[];
+    totalDuration: number;
+    isDark: boolean;
+}) {
+    const size = 260;
+    const center = size / 2;
+    const strokeW = 32;
+    const r = (size - strokeW) / 2 - 10; // ~104
+    const circumference = 2 * Math.PI * r; // ~653.45
+
+    let accumulatedPercent = 0;
+    const gap = stats.length > 1 ? 1.5 : 0;
 
     return (
-        <foreignObject x={x - 10} y={y - 10} width={20} height={20}>
-            <div className="w-full h-full flex items-center justify-center text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
-                <DynamicIcon name={payload.icon} size={14} color="#ffffff" />
-            </div>
-        </foreignObject>
+        <div className="relative flex items-center justify-center my-3">
+            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                {/* Background track */}
+                <circle
+                    cx={center}
+                    cy={center}
+                    r={r}
+                    fill="none"
+                    stroke={isDark ? '#262626' : '#f1f5f9'}
+                    strokeWidth={strokeW}
+                />
+
+                {/* Slices */}
+                {stats.map((item) => {
+                    const itemPercent = Math.max(0, item.percent);
+                    if (itemPercent <= 0) return null;
+
+                    const effectivePercent = Math.max(0.5, itemPercent - gap);
+                    const strokeDasharray = `${(effectivePercent / 100) * circumference} ${circumference}`;
+                    const strokeDashoffset = -((accumulatedPercent + gap / 2) / 100) * circumference;
+
+                    accumulatedPercent += itemPercent;
+
+                    return (
+                        <circle
+                            key={item.id}
+                            cx={center}
+                            cy={center}
+                            r={r}
+                            fill="none"
+                            stroke={item.color}
+                            strokeWidth={strokeW}
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={strokeDashoffset}
+                            strokeLinecap="round"
+                            transform={`rotate(-90 ${center} ${center})`}
+                        />
+                    );
+                })}
+
+                {/* Center text */}
+                <text
+                    x={center}
+                    y={center - 6}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill={isDark ? '#ffffff' : '#0f172a'}
+                    style={{
+                        fontSize: '26px',
+                        fontWeight: 900,
+                        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+                    }}
+                >
+                    {formatDuration(totalDuration)}
+                </text>
+                <text
+                    x={center}
+                    y={center + 20}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill={isDark ? '#737373' : '#94a3b8'}
+                    style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '2px',
+                        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+                    }}
+                >
+                    TOTAL
+                </text>
+            </svg>
+        </div>
     );
-};
+}
 
 export default function StatisticsExportModal({
     isOpen,
@@ -97,20 +180,26 @@ export default function StatisticsExportModal({
 
         const generate = async () => {
             try {
-                if (document.fonts) {
-                    await document.fonts.ready;
-                }
-                // Short wait to ensure SVG paths are completely painted
-                await new Promise((r) => setTimeout(r, 220));
+                // Short wait to allow the DOM node to attach and paint
+                await new Promise((r) => setTimeout(r, 120));
 
                 if (!exportCardRef.current || !isMounted) return;
 
-                const dataUrl = await toPng(exportCardRef.current, {
-                    pixelRatio: 2,
-                    quality: 0.96,
-                    cacheBust: true,
-                    backgroundColor: isDark ? '#0d0d0d' : '#f8fafc',
-                });
+                // 3-second timeout protection to ensure it NEVER hangs indefinitely
+                const timeoutPromise = new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('Export timed out')), 3500)
+                );
+
+                const dataUrl = await Promise.race([
+                    toPng(exportCardRef.current, {
+                        pixelRatio: 2,
+                        quality: 0.95,
+                        cacheBust: true,
+                        skipFonts: true, // Prevents hanging on external web font fetches
+                        backgroundColor: isDark ? '#0d0d0d' : '#f8fafc',
+                    }),
+                    timeoutPromise,
+                ]);
 
                 if (isMounted) {
                     setImageUrl(dataUrl);
@@ -118,7 +207,9 @@ export default function StatisticsExportModal({
                 }
             } catch (err) {
                 console.error('Failed to generate page image:', err);
-                if (isMounted) setIsGenerating(false);
+                if (isMounted) {
+                    setIsGenerating(false);
+                }
             }
         };
 
@@ -141,16 +232,12 @@ export default function StatisticsExportModal({
 
     // Native Web Share Handler
     const handleShare = async () => {
-        if (!exportCardRef.current) return;
+        if (!imageUrl) return;
         try {
-            const blob = await toBlob(exportCardRef.current, {
-                pixelRatio: 2,
-                quality: 0.96,
-                backgroundColor: isDark ? '#0d0d0d' : '#f8fafc',
+            const blob = await dataUrlToBlob(imageUrl);
+            const file = new File([blob], `istatistik-${periodTitle.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`, {
+                type: 'image/png',
             });
-            if (!blob) return;
-
-            const file = new File([blob], `istatistik-${periodTitle.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`, { type: 'image/png' });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
@@ -168,15 +255,9 @@ export default function StatisticsExportModal({
 
     // Copy to clipboard
     const handleCopyImage = async () => {
-        if (!exportCardRef.current) return;
+        if (!imageUrl) return;
         try {
-            const blob = await toBlob(exportCardRef.current, {
-                pixelRatio: 2,
-                quality: 0.96,
-                backgroundColor: isDark ? '#0d0d0d' : '#f8fafc',
-            });
-            if (!blob) return;
-
+            const blob = await dataUrlToBlob(imageUrl);
             if (navigator.clipboard && 'write' in navigator.clipboard && typeof ClipboardItem !== 'undefined') {
                 const item = new ClipboardItem({ 'image/png': blob });
                 await navigator.clipboard.write([item]);
@@ -270,7 +351,13 @@ export default function StatisticsExportModal({
                                     💡 İpucu: Mobilde görselin üzerine basılı tutarak doğrudan galerinize kaydedebilirsiniz.
                                 </p>
                             </div>
-                        ) : null}
+                        ) : (
+                            <div className="text-center py-10">
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Görsel oluşturulamadı. Lütfen tekrar deneyin.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Modal Footer: Action Buttons */}
@@ -314,19 +401,20 @@ export default function StatisticsExportModal({
                 {/* ── OFF-SCREEN DEDICATED SNAPSHOT TEMPLATE (Circle + Activities) ── */}
                 <div
                     style={{
-                        position: 'fixed',
-                        left: '-9999px',
-                        top: '-9999px',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        zIndex: -9999,
+                        opacity: 0,
                         pointerEvents: 'none',
-                        zIndex: -1,
                     }}
                 >
                     <div
                         ref={exportCardRef}
-                        style={{ width: '450px' }}
+                        style={{ width: '430px' }}
                         className={`p-6 rounded-[32px] font-sans ${
                             isDark ? 'dark bg-[#0d0d0d] text-white' : 'bg-[#f8fafc] text-gray-900'
-                        } border border-gray-200/80 dark:border-neutral-800 shadow-2xl space-y-5`}
+                        } border border-gray-200/80 dark:border-neutral-800 shadow-2xl space-y-4`}
                     >
                         {/* 1. Header with Period & Branding */}
                         <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-neutral-800">
@@ -350,38 +438,12 @@ export default function StatisticsExportModal({
                             </span>
                         </div>
 
-                        {/* 2. Donut Pie Chart (İstatistik Circle'ı) */}
-                        <div className="relative w-full flex items-center justify-center my-2">
-                            <PieChart width={390} height={230}>
-                                <Pie
-                                    data={stats}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={72}
-                                    outerRadius={106}
-                                    paddingAngle={stats.length > 1 ? 3 : 0}
-                                    dataKey="duration"
-                                    nameKey="name"
-                                    stroke="none"
-                                    isAnimationActive={false}
-                                    labelLine={false}
-                                    label={renderCustomizedLabel}
-                                >
-                                    {stats.map((entry) => (
-                                        <Cell key={entry.id} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                            </PieChart>
-                            {/* Center Duration & Label */}
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-2xl font-black tracking-tight text-gray-900 dark:text-white tabular-nums">
-                                    {formatDuration(totalDuration)}
-                                </span>
-                                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-0.5">
-                                    total
-                                </span>
-                            </div>
-                        </div>
+                        {/* 2. Donut Chart (İstatistik Circle'ı) */}
+                        <SvgDonutChart
+                            stats={stats}
+                            totalDuration={totalDuration}
+                            isDark={isDark}
+                        />
 
                         {/* 3. Section Header */}
                         <div className="flex items-center justify-between pt-1 mb-1">
@@ -398,7 +460,7 @@ export default function StatisticsExportModal({
                             {stats.map((item) => (
                                 <div
                                     key={item.id}
-                                    className="p-3.5 rounded-2xl bg-white dark:bg-[#161616] border border-gray-100 dark:border-neutral-800/80 shadow-xs flex items-center justify-between"
+                                    className="p-3 rounded-2xl bg-white dark:bg-[#161616] border border-gray-100 dark:border-neutral-800/80 shadow-xs flex items-center justify-between"
                                 >
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div
