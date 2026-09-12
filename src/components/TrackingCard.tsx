@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { motion } from 'framer-motion';
+import { ChevronRight } from 'lucide-react';
 import { getContrastColor } from '../utils/colors';
 import DynamicIcon from './DynamicIcon';
 
@@ -13,6 +14,7 @@ interface TrackingCardProps {
     onClick?: () => void;
     onLongPress?: () => void;
     className?: string;
+    showChevron?: boolean;
 }
 
 export default function TrackingCard({
@@ -25,6 +27,7 @@ export default function TrackingCard({
     onClick,
     onLongPress,
     className = '',
+    showChevron = false,
 }: TrackingCardProps) {
     const contrast = getContrastColor(color);
     const timerRef = useRef<number | null>(null);
@@ -90,18 +93,27 @@ export default function TrackingCard({
                     </div>
                 </div>
 
-                {/* Right side: total elapsed + today */}
-                <div className="text-right flex-shrink-0 ml-3">
-                    <p
-                        className="text-base font-bold tabular-nums"
-                        style={{ color: contrast }}
-                    >
-                        {titleRight}
-                    </p>
-                    {subtitleRight && (
-                        <p className="text-xs font-medium opacity-70" style={{ color: contrast }}>
-                            {subtitleRight}
+                {/* Right side: total elapsed + subtitle + optional chevron */}
+                <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                    <div className="text-right">
+                        <p
+                            className="text-base font-bold tabular-nums"
+                            style={{ color: contrast }}
+                        >
+                            {titleRight}
                         </p>
+                        {subtitleRight && (
+                            <p className="text-xs font-medium opacity-70" style={{ color: contrast }}>
+                                {subtitleRight}
+                            </p>
+                        )}
+                    </div>
+                    {showChevron && (
+                        <ChevronRight
+                            size={16}
+                            className="opacity-40 flex-shrink-0 -mr-0.5"
+                            style={{ color: contrast }}
+                        />
                     )}
                 </div>
             </div>

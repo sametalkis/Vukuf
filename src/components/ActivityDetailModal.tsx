@@ -1,6 +1,18 @@
 import { useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, Calendar, TrendingUp, Flame, ChevronRight, Award } from 'lucide-react';
+import {
+    X,
+    Clock,
+    Calendar,
+    TrendingUp,
+    Flame,
+    ChevronRight,
+    Award,
+    ArrowRight,
+    Repeat,
+    Sparkles,
+} from 'lucide-react';
 import {
     BarChart,
     Bar,
@@ -15,6 +27,7 @@ import type { ViewMode } from './DateSelectorBar';
 import DynamicIcon from './DynamicIcon';
 import { getContrastColor } from '../utils/colors';
 import { formatDuration } from '../utils/time';
+import { useStore } from '../store/useStore';
 
 interface ActivityDetailModalProps {
     isOpen: boolean;
@@ -42,6 +55,8 @@ function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 export default function ActivityDetailModal({
     isOpen,
     onClose,
@@ -51,6 +66,8 @@ export default function ActivityDetailModal({
     activityRecords,
     onSelectRecord,
 }: ActivityDetailModalProps) {
+    const { recordTypes, records: allStoreRecords } = useStore();
+
     // Close on Escape key
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -61,6 +78,35 @@ export default function ActivityDetailModal({
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, onClose]);
+
+    // Prevent body scroll when modal is open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [isOpen]);
+
+    // Deduplicate split records back into full unique records
+    const uniqueRecords = useMemo(() => {
+        if (!activity || activityRecords.length === 0) return [];
+
+        const map = new Map<string, TimeRecord>();
+        for (const r of activityRecords) {
+            const original = (r as any).originalRecord || r;
+            const key = original.id || r.id;
+            if (!map.has(key)) {
+                map.set(key, original);
+            }
+        }
+        return Array.from(map.values()).sort(
+            (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+        );
+    }, [activity, activityRecords]);
 
     // Period Title
     const periodTitle = useMemo(() => {
@@ -78,7 +124,181 @@ export default function ActivityDetailModal({
         return 'All Time';
     }, [viewMode, selectedDate]);
 
-    // Compute Metrics & Insights
+    // ── Habit Sequence & Transition Insights ──
+    // "En çok hangi aktiviteden sonra geliyor?" & "En çok hangisine geçiliyor?"
+    const habitTransitions = useMemo(() => {
+        if (!activity) {
+            return {
+                preceding: [],
+                succeeding: [],
+                topPreceding: null,
+                topSucceeding: null,
+                totalTransitions: 0,
+            };
+        }
+
+        // Chronologically sorted all finished records
+        const sorted = [...allStoreRecords].sort(
+            (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
+
+        const precedingCounts: Record<string, number> = {};
+        const succeedingCounts: Record<string, number> = {};
+        let totalPreceding = 0;
+        let totalSucceeding = 0;
+
+        for (let i = 0; i < sorted.length; i++) {
+            if (sorted[i].recordTypeId === activity.id) {
+                // Preceding: closest previous record within 6 hours
+                if (i > 0) {
+                    const prev = sorted[i - 1];
+                    const gapMs = new Date(sorted[i].startTime).getTime() - new Date(prev.endTime).getTime();
+                    if (gapMs >= 0 && gapMs <= 6 * 3600 * 1000 && prev.recordTypeId !== activity.id) {
+                        precedingCounts[prev.recordTypeId] = (precedingCounts[prev.recordTypeId] || 0) + 1;
+                        totalPreceding++;
+                    }
+                }
+
+                // Succeeding: closest next record within 6 hours
+                if (i < sorted.length - 1) {
+                    const next = sorted[i + 1];
+                    const gapMs = new Date(next.startTime).getTime() - new Date(sorted[i].endTime).getTime();
+                    if (gapMs >= 0 && gapMs <= 6 * 3600 * 1000 && next.recordTypeId !== activity.id) {
+                        succeedingCounts[next.recordTypeId] = (succeedingCounts[next.recordTypeId] || 0) + 1;
+                        totalSucceeding++;
+                    }
+                }
+            }
+        }
+
+        const mapCounts = (counts: Record<string, number>, total: number) => {
+            return Object.entries(counts)
+                .map(([typeId, count]) => {
+                    const act = recordTypes.find((r) => r.id === typeId);
+                    return {
+                        id: typeId,
+                        name: act?.name || 'Activity',
+                        color: act?.color || '#9ca3af',
+                        icon: act?.icon || 'Clock',
+                        count,
+                        percent: total > 0 ? Math.round((count / total) * 100) : 0,
+                    };
+                })
+                .sort((a, b) => b.count - a.count);
+        };
+
+        const precedingList = mapCounts(precedingCounts, totalPreceding);
+        const succeedingList = mapCounts(succeedingCounts, totalSucceeding);
+
+        return {
+            preceding: precedingList,
+            succeeding: succeedingList,
+            topPreceding: precedingList[0] || null,
+            topSucceeding: succeedingList[0] || null,
+            totalTransitions: totalPreceding,
+        };
+    }, [activity, allStoreRecords, recordTypes]);
+
+    // ── Day of Week Distribution (Pzt - Paz) ──
+    const weekdayDistribution = useMemo(() => {
+        if (!activity || activityRecords.length === 0) return [];
+
+        // Monday (0) to Sunday (6)
+        const days = Array.from({ length: 7 }, (_, i) => ({
+            dayIndex: i,
+            label: WEEKDAY_NAMES[i],
+            duration: 0,
+        }));
+
+        for (const r of activityRecords) {
+            const date = new Date(r.startTime);
+            // JS getDay(): 0 is Sunday, 1 is Monday ... 6 is Saturday
+            const jsDay = date.getDay();
+            const idx = jsDay === 0 ? 6 : jsDay - 1; // Convert to Mon=0 ... Sun=6
+            days[idx].duration += r.duration;
+        }
+
+        const maxDuration = Math.max(1, ...days.map((d) => d.duration));
+        const totalDuration = days.reduce((sum, d) => sum + d.duration, 0);
+
+        return days.map((d) => ({
+            ...d,
+            percentOfMax: Math.round((d.duration / maxDuration) * 100),
+            percentOfTotal: totalDuration > 0 ? Math.round((d.duration / totalDuration) * 100) : 0,
+            formatted: formatDuration(d.duration),
+        }));
+    }, [activity, activityRecords]);
+
+    const bestWeekday = useMemo(() => {
+        if (!weekdayDistribution.length) return null;
+        let best = weekdayDistribution[0];
+        for (const d of weekdayDistribution) {
+            if (d.duration > best.duration) best = d;
+        }
+        return best.duration > 0 ? best : null;
+    }, [weekdayDistribution]);
+
+    // ── Streak & Consistency Metrics ──
+    const consistencyStats = useMemo(() => {
+        if (!activity) return { activeDaysCount: 0, currentStreak: 0, bestStreak: 0 };
+
+        const allActRecords = allStoreRecords.filter((r) => r.recordTypeId === activity.id);
+        if (allActRecords.length === 0) return { activeDaysCount: 0, currentStreak: 0, bestStreak: 0 };
+
+        // Unique days set
+        const dayStrings = new Set<string>();
+        for (const r of allActRecords) {
+            const d = new Date(r.startTime);
+            dayStrings.add(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`);
+        }
+
+        // Calculate streaks
+        const sortedDates = Array.from(dayStrings)
+            .map((s) => {
+                const [y, m, d] = s.split('-').map(Number);
+                return new Date(y, m - 1, d).getTime();
+            })
+            .sort((a, b) => a - b);
+
+        let maxStreak = 0;
+        let streak = 0;
+        let prevTime = 0;
+        const ONE_DAY_MS = 24 * 3600 * 1000;
+
+        for (const t of sortedDates) {
+            if (prevTime === 0) {
+                streak = 1;
+            } else if (Math.round((t - prevTime) / ONE_DAY_MS) === 1) {
+                streak++;
+            } else {
+                streak = 1;
+            }
+            if (streak > maxStreak) maxStreak = streak;
+            prevTime = t;
+        }
+
+        // Check if current streak extends to today/yesterday
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const lastDate = sortedDates[sortedDates.length - 1];
+        const diffDays = Math.round((today.getTime() - lastDate) / ONE_DAY_MS);
+        const currentStreak = diffDays <= 1 ? streak : 0;
+
+        // Active days in current period
+        const periodDayStrings = new Set<string>();
+        for (const r of activityRecords) {
+            const d = new Date(r.startTime);
+            periodDayStrings.add(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`);
+        }
+
+        return {
+            activeDaysCount: periodDayStrings.size,
+            currentStreak,
+            bestStreak: maxStreak,
+        };
+    }, [activity, allStoreRecords, activityRecords]);
+
+    // ── Trend Chart & Time of Day Calculation ──
     const {
         avgSessionDuration,
         longestSession,
@@ -96,10 +316,10 @@ export default function ActivityDetailModal({
             };
         }
 
-        // Longest session
+        // Longest session from unique records
         let longest: TimeRecord | null = null;
         let longestSec = 0;
-        for (const r of activityRecords) {
+        for (const r of uniqueRecords) {
             if (r.duration > longestSec) {
                 longestSec = r.duration;
                 longest = r;
@@ -107,13 +327,9 @@ export default function ActivityDetailModal({
         }
 
         // Average session duration
-        const avgSession = Math.round(activity.duration / Math.max(1, activityRecords.length));
+        const avgSession = Math.round(activity.duration / Math.max(1, uniqueRecords.length));
 
         // Time of Day distribution
-        // Morning: 06:00 - 12:00
-        // Afternoon: 12:00 - 18:00
-        // Evening: 18:00 - 24:00
-        // Night: 00:00 - 06:00
         const tod = { morning: 0, afternoon: 0, evening: 0, night: 0 };
         for (const r of activityRecords) {
             const startH = new Date(r.startTime).getHours();
@@ -149,28 +365,38 @@ export default function ActivityDetailModal({
         const cData: { label: string; duration: number; formatted: string }[] = [];
 
         if (viewMode === 'day') {
-            // Group by 2-hour or hourly buckets
-            const hourBuckets = Array.from({ length: 12 }, (_, i) => ({
-                hour: i * 2,
-                label: `${(i * 2).toString().padStart(2, '0')}:00`,
-                duration: 0,
-            }));
+            // Precise mathematical hourly buckets (00..23) without overflow
+            const hourMins = Array.from({ length: 24 }, () => 0);
 
             for (const r of activityRecords) {
-                const h = new Date(r.startTime).getHours();
-                const bucketIdx = Math.min(11, Math.floor(h / 2));
-                hourBuckets[bucketIdx].duration += r.duration;
+                const rStart = new Date(r.startTime);
+                const rEnd = new Date(r.endTime);
+
+                for (let h = 0; h < 24; h++) {
+                    const bStart = new Date(selectedDate);
+                    bStart.setHours(h, 0, 0, 0);
+                    const bEnd = new Date(bStart);
+                    bEnd.setHours(h + 1, 0, 0, 0);
+
+                    const overlapStart = Math.max(rStart.getTime(), bStart.getTime());
+                    const overlapEnd = Math.min(rEnd.getTime(), bEnd.getTime());
+                    if (overlapEnd > overlapStart) {
+                        hourMins[h] += Math.round((overlapEnd - overlapStart) / 60000);
+                    }
+                }
             }
 
-            for (const b of hourBuckets) {
+            // Display every 2 hours or all hours with duration > 0
+            for (let h = 0; h < 24; h++) {
+                // Show alternate hour labels to avoid crowding
+                const label = h % 2 === 0 ? `${h.toString().padStart(2, '0')}:00` : '';
                 cData.push({
-                    label: b.label,
-                    duration: Math.round(b.duration / 60), // in minutes
-                    formatted: formatDuration(b.duration),
+                    label: label || `${h}:00`,
+                    duration: hourMins[h],
+                    formatted: `${hourMins[h]}m`,
                 });
             }
         } else if (viewMode === 'month') {
-            // Days in month
             const year = selectedDate.getFullYear();
             const month = selectedDate.getMonth();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -191,12 +417,11 @@ export default function ActivityDetailModal({
             for (const b of dayBuckets) {
                 cData.push({
                     label: b.label,
-                    duration: Math.round((b.duration / 3600) * 10) / 10, // in hours (1 decimal)
+                    duration: Math.round((b.duration / 3600) * 10) / 10, // in hours
                     formatted: formatDuration(b.duration),
                 });
             }
         } else if (viewMode === 'year') {
-            // 12 months
             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             const monthBuckets = monthNames.map((m) => ({ label: m, duration: 0 }));
 
@@ -210,12 +435,11 @@ export default function ActivityDetailModal({
             for (const b of monthBuckets) {
                 cData.push({
                     label: b.label,
-                    duration: Math.round((b.duration / 3600) * 10) / 10, // in hours
+                    duration: Math.round((b.duration / 3600) * 10) / 10,
                     formatted: formatDuration(b.duration),
                 });
             }
         } else {
-            // All time - last 6 months or all months
             const byMonthYear: Record<string, { label: string; duration: number }> = {};
             for (const r of activityRecords) {
                 const d = new Date(r.startTime);
@@ -244,14 +468,7 @@ export default function ActivityDetailModal({
             timeOfDayStats: tod,
             peakTimeSlot: peakSlotLabels[peakSlot] || '',
         };
-    }, [activity, activityRecords, viewMode, selectedDate]);
-
-    // Sorted sessions (newest first)
-    const sortedRecords = useMemo(() => {
-        return [...activityRecords].sort(
-            (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-        );
-    }, [activityRecords]);
+    }, [activity, activityRecords, uniqueRecords, viewMode, selectedDate]);
 
     if (!isOpen || !activity) return null;
 
@@ -262,7 +479,7 @@ export default function ActivityDetailModal({
         timeOfDayStats.morning + timeOfDayStats.afternoon + timeOfDayStats.evening + timeOfDayStats.night
     );
 
-    return (
+    return createPortal(
         <AnimatePresence>
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
                 {/* Backdrop */}
@@ -271,7 +488,7 @@ export default function ActivityDetailModal({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={onClose}
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm"
                 />
 
                 {/* Modal Container */}
@@ -280,14 +497,14 @@ export default function ActivityDetailModal({
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: '100%', opacity: 0 }}
                     transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-                    className="relative w-full max-w-xl bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden z-10"
+                    className="relative w-full max-w-xl bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] overflow-hidden z-10 border border-gray-100 dark:border-gray-800"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Mobile Pull Indicator */}
                     <div className="w-12 h-1.5 rounded-full bg-gray-300 dark:bg-gray-700 mx-auto mt-2.5 mb-1 sm:hidden flex-shrink-0" />
 
                     {/* Header */}
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
                         <div className="flex items-center gap-3 min-w-0">
                             <div
                                 className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
@@ -321,7 +538,7 @@ export default function ActivityDetailModal({
 
                     {/* Scrollable Content */}
                     <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-                        {/* KPI Metric Grid */}
+                        {/* ── KPI Metric Grid ── */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                             {/* Total Duration */}
                             <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
@@ -341,7 +558,7 @@ export default function ActivityDetailModal({
                                     <span className="text-xs font-medium">Sessions</span>
                                 </div>
                                 <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                                    {activity.sessionCount}
+                                    {uniqueRecords.length}
                                 </p>
                             </div>
 
@@ -356,46 +573,208 @@ export default function ActivityDetailModal({
                                 </p>
                             </div>
 
+                            {/* Active Days */}
+                            <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500 mb-1">
+                                    <Repeat size={14} />
+                                    <span className="text-xs font-medium">Active Days</span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
+                                    {consistencyStats.activeDaysCount} days
+                                </p>
+                            </div>
+
+                            {/* Best Streak */}
+                            <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-amber-500 mb-1">
+                                    <Flame size={14} />
+                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Best Streak</span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
+                                    {consistencyStats.bestStreak} {consistencyStats.bestStreak === 1 ? 'day' : 'days'}
+                                </p>
+                            </div>
+
                             {/* Longest Session */}
-                            {longestSession && (
-                                <div className="col-span-2 sm:col-span-3 p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 flex items-center justify-between">
-                                    <div className="flex items-center gap-2.5">
-                                        <div
-                                            className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
-                                            style={{ backgroundColor: activity.color }}
-                                        >
-                                            <Award size={16} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-400 dark:text-gray-500">
-                                                Longest Session
-                                            </p>
-                                            <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
-                                                {formatDuration(longestSession.duration)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">
-                                        {formatDate(longestSession.startTime)}
+                            <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-emerald-500 mb-1">
+                                    <Award size={14} />
+                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500">Longest</span>
+                                </div>
+                                <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums truncate">
+                                    {longestSession ? formatDuration(longestSession.duration) : '-'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* ── Habit Sequence & Transition Analysis ("En Çok Hangi Aktiviteden Sonra Geliyor?") ── */}
+                        <div className="p-4 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100/70 dark:from-gray-800/60 dark:to-gray-800/30 border border-gray-100 dark:border-gray-800 space-y-3.5">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles size={16} className="text-amber-500" />
+                                    <span className="text-xs font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">
+                                        Habit Sequence & Flow
                                     </span>
+                                </div>
+                                <span className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">
+                                    Transition Insights
+                                </span>
+                            </div>
+
+                            {/* Visual Chain representation */}
+                            <div className="flex items-center justify-between gap-1 p-3 rounded-xl bg-white dark:bg-gray-900/80 border border-gray-100 dark:border-gray-800 shadow-sm">
+                                {/* Preceding Activity */}
+                                <div className="flex-1 flex flex-col items-center text-center p-1">
+                                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1">
+                                        Preceded By
+                                    </span>
+                                    {habitTransitions.topPreceding ? (
+                                        <>
+                                            <div
+                                                className="w-8 h-8 rounded-lg flex items-center justify-center mb-1 text-white shadow-sm"
+                                                style={{ backgroundColor: habitTransitions.topPreceding.color }}
+                                            >
+                                                <DynamicIcon name={habitTransitions.topPreceding.icon} size={16} />
+                                            </div>
+                                            <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate max-w-[90px]">
+                                                {habitTransitions.topPreceding.name}
+                                            </p>
+                                            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                %{habitTransitions.topPreceding.percent} ({habitTransitions.topPreceding.count}x)
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="text-xs text-gray-400 italic py-3">-</span>
+                                    )}
+                                </div>
+
+                                <ArrowRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+
+                                {/* Current Activity */}
+                                <div className="flex-1 flex flex-col items-center text-center p-1 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <span className="text-[10px] font-semibold text-primary-500 dark:text-primary-400 uppercase mb-1">
+                                        This Activity
+                                    </span>
+                                    <div
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center mb-1 shadow-sm"
+                                        style={{ backgroundColor: activity.color, color: contrast }}
+                                    >
+                                        <DynamicIcon name={activity.icon} size={16} />
+                                    </div>
+                                    <p className="text-xs font-bold text-gray-900 dark:text-gray-100 truncate max-w-[90px]">
+                                        {activity.name}
+                                    </p>
+                                    <span className="text-[10px] text-gray-400">Current</span>
+                                </div>
+
+                                <ArrowRight size={16} className="text-gray-300 dark:text-gray-600 flex-shrink-0" />
+
+                                {/* Following Activity */}
+                                <div className="flex-1 flex flex-col items-center text-center p-1">
+                                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1">
+                                        Followed By
+                                    </span>
+                                    {habitTransitions.topSucceeding ? (
+                                        <>
+                                            <div
+                                                className="w-8 h-8 rounded-lg flex items-center justify-center mb-1 text-white shadow-sm"
+                                                style={{ backgroundColor: habitTransitions.topSucceeding.color }}
+                                            >
+                                                <DynamicIcon name={habitTransitions.topSucceeding.icon} size={16} />
+                                            </div>
+                                            <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate max-w-[90px]">
+                                                {habitTransitions.topSucceeding.name}
+                                            </p>
+                                            <span className="text-[10px] font-medium text-sky-600 dark:text-sky-400">
+                                                %{habitTransitions.topSucceeding.percent} ({habitTransitions.topSucceeding.count}x)
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="text-xs text-gray-400 italic py-3">-</span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Detailed transitions breakdown list if multiple */}
+                            {habitTransitions.preceding.length > 1 && (
+                                <div className="pt-1">
+                                    <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                                        Other activities usually preceding {activity.name}:
+                                    </p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {habitTransitions.preceding.slice(1).map((p) => (
+                                            <div
+                                                key={p.id}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-[11px]"
+                                            >
+                                                <div
+                                                    className="w-2 h-2 rounded-full"
+                                                    style={{ backgroundColor: p.color }}
+                                                />
+                                                <span className="font-semibold text-gray-700 dark:text-gray-300">
+                                                    {p.name}
+                                                </span>
+                                                <span className="text-gray-400">%{p.percent} ({p.count}x)</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Trend Bar Chart */}
+                        {/* ── Day of the Week Distribution (Pzt - Paz) ── */}
+                        {viewMode !== 'day' && weekdayDistribution.length > 0 && (
+                            <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                                        Day of the Week Distribution
+                                    </span>
+                                    {bestWeekday && (
+                                        <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md">
+                                            🏆 Peak Day: {bestWeekday.label} ({bestWeekday.formatted})
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-7 gap-1.5 pt-2">
+                                    {weekdayDistribution.map((d) => (
+                                        <div key={d.dayIndex} className="flex flex-col items-center">
+                                            <div className="w-full h-24 bg-gray-200 dark:bg-gray-700 rounded-xl flex items-end p-1 overflow-hidden">
+                                                <div
+                                                    style={{
+                                                        height: `${Math.max(8, d.percentOfMax)}%`,
+                                                        backgroundColor: activity.color,
+                                                    }}
+                                                    className="w-full rounded-lg transition-all duration-500 opacity-90 hover:opacity-100"
+                                                    title={`${d.label}: ${d.formatted} (%${d.percentOfTotal})`}
+                                                />
+                                            </div>
+                                            <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300 mt-1.5">
+                                                {d.label}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+                                                {d.duration > 0 ? formatDuration(d.duration) : '-'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Trend Distribution Chart ── */}
                         {chartData.length > 0 && (
                             <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                        Activity Distribution
+                                        Timeline Breakdown
                                     </span>
                                     <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                        {viewMode === 'day' ? 'Duration (min)' : 'Duration (hours)'}
+                                        {viewMode === 'day' ? 'Minutes per Hour' : 'Hours'}
                                     </span>
                                 </div>
-                                <div className="h-44 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={chartData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
+                                <div className="h-44 w-full min-w-0" style={{ minHeight: '176px' }}>
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={176}>
+                                        <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                                             <XAxis
                                                 dataKey="label"
                                                 tickLine={false}
@@ -419,7 +798,7 @@ export default function ActivityDetailModal({
                                                     );
                                                 }}
                                             />
-                                            <Bar dataKey="duration" radius={[4, 4, 0, 0]}>
+                                            <Bar dataKey="duration" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                                                 {chartData.map((_, index) => (
                                                     <Cell key={`cell-${index}`} fill={activity.color} />
                                                 ))}
@@ -430,7 +809,7 @@ export default function ActivityDetailModal({
                             </div>
                         )}
 
-                        {/* Time of Day Breakdown */}
+                        {/* ── Time of Day Pattern (Morning, Afternoon, Evening, Night) ── */}
                         <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -497,13 +876,13 @@ export default function ActivityDetailModal({
                             </div>
                         </div>
 
-                        {/* Recorded Sessions List */}
+                        {/* ── Recorded Sessions List ── */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                                    Sessions in this period ({sortedRecords.length})
+                                    Sessions in this period ({uniqueRecords.length})
                                 </span>
-                                {onSelectRecord && sortedRecords.length > 0 && (
+                                {onSelectRecord && uniqueRecords.length > 0 && (
                                     <span className="text-[11px] text-gray-400 dark:text-gray-500">
                                         Tap to edit
                                     </span>
@@ -511,7 +890,7 @@ export default function ActivityDetailModal({
                             </div>
 
                             <div className="space-y-1.5">
-                                {sortedRecords.map((rec) => (
+                                {uniqueRecords.map((rec) => (
                                     <button
                                         key={rec.id}
                                         type="button"
@@ -541,7 +920,7 @@ export default function ActivityDetailModal({
                                     </button>
                                 ))}
 
-                                {sortedRecords.length === 0 && (
+                                {uniqueRecords.length === 0 && (
                                     <div className="py-6 text-center text-xs text-gray-400 dark:text-gray-500">
                                         No individual sessions found for this period.
                                     </div>
@@ -551,6 +930,7 @@ export default function ActivityDetailModal({
                     </div>
                 </motion.div>
             </div>
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 }

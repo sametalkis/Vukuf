@@ -54,7 +54,7 @@ export default function StatisticsScreen() {
     const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
     // Detail modal & edit record modal state
-    const [selectedDetailActivity, setSelectedDetailActivity] = useState<{
+    const [activeModalActivity, setActiveModalActivity] = useState<{
         id: string;
         name: string;
         color: string;
@@ -63,7 +63,28 @@ export default function StatisticsScreen() {
         sessionCount: number;
         percent: number;
     } | null>(null);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<(TimeRecord & { isRunning?: boolean }) | null>(null);
+
+    const handleOpenDetail = (item: {
+        id: string;
+        name: string;
+        color: string;
+        icon: string;
+        duration: number;
+        sessionCount: number;
+        percent: number;
+    }) => {
+        setActiveModalActivity(item);
+        setIsDetailOpen(true);
+    };
+
+    const handleCloseDetail = () => {
+        setIsDetailOpen(false);
+        setTimeout(() => {
+            setActiveModalActivity(null);
+        }, 320);
+    };
 
     // Live tick for running record on stats screen
     const [tick, setTick] = useState(0);
@@ -136,14 +157,14 @@ export default function StatisticsScreen() {
 
     // Dynamic data for active detailed activity
     const activeDetailActivity = useMemo(() => {
-        if (!selectedDetailActivity) return null;
-        return stats.find((s) => s.id === selectedDetailActivity.id) || selectedDetailActivity;
-    }, [stats, selectedDetailActivity]);
+        if (!activeModalActivity) return null;
+        return stats.find((s) => s.id === activeModalActivity.id) || activeModalActivity;
+    }, [stats, activeModalActivity]);
 
     const selectedActivityRecords = useMemo(() => {
-        if (!selectedDetailActivity) return [];
-        return filteredRecords.filter((r) => r.recordTypeId === selectedDetailActivity.id);
-    }, [filteredRecords, selectedDetailActivity]);
+        if (!activeDetailActivity) return [];
+        return filteredRecords.filter((r) => r.recordTypeId === activeDetailActivity.id);
+    }, [filteredRecords, activeDetailActivity]);
 
     return (
         <div className="flex flex-col min-h-screen pt-4 pb-[136px]">
@@ -176,9 +197,19 @@ export default function StatisticsScreen() {
                                     isAnimationActive={false}
                                     labelLine={false}
                                     label={renderCustomizedLabel}
+                                    onClick={(entry: any) => {
+                                        if (entry && entry.id) {
+                                            const target = stats.find((s) => s.id === entry.id);
+                                            if (target) handleOpenDetail(target);
+                                        }
+                                    }}
                                 >
                                     {stats.map((entry) => (
-                                        <Cell key={entry.id} fill={entry.color} />
+                                        <Cell
+                                            key={entry.id}
+                                            fill={entry.color}
+                                            className="cursor-pointer hover:opacity-80 transition-opacity outline-none"
+                                        />
                                     ))}
                                 </Pie>
                                 <Tooltip content={<CustomTooltip />} />
@@ -212,7 +243,8 @@ export default function StatisticsScreen() {
                                 subtitleLeft={formatPercent(item.percent)}
                                 titleRight={formatDuration(item.duration)}
                                 subtitleRight={`${item.sessionCount} ${item.sessionCount === 1 ? 'session' : 'sessions'}`}
-                                onClick={() => setSelectedDetailActivity(item)}
+                                onClick={() => handleOpenDetail(item)}
+                                showChevron={true}
                                 className="cursor-pointer active:scale-[0.98] transition-transform"
                             />
                         ))}
@@ -222,8 +254,8 @@ export default function StatisticsScreen() {
 
             {/* Activity Detail Modal */}
             <ActivityDetailModal
-                isOpen={Boolean(activeDetailActivity)}
-                onClose={() => setSelectedDetailActivity(null)}
+                isOpen={isDetailOpen}
+                onClose={handleCloseDetail}
                 activity={activeDetailActivity}
                 viewMode={viewMode}
                 selectedDate={selectedDate}
