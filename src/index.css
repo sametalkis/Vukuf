@@ -65,18 +65,19 @@
   align-items: center;
   justify-content: space-around;
   padding: 5px 4px;
-  background: linear-gradient(135deg, rgba(23, 23, 23, 0.88), rgba(15, 15, 15, 0.94));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(240, 240, 246, 0.96));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 9999px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.8);
 }
 
-:not(.dark) .bottom-nav__dock {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(240, 240, 246, 0.96));
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.8);
+/* Dark mode dock */
+.dark .bottom-nav__dock {
+  background: linear-gradient(135deg, rgba(20, 20, 20, 0.92), rgba(12, 12, 12, 0.96));
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.15);
 }
 
 /* Kaydırmalı Kapsül Göstergesi (Sliding Active Pill) */
@@ -98,7 +99,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #888888;
+  color: #71717a;
   text-decoration: none !important;
   transition: color 0.25s ease;
   position: relative;
@@ -107,8 +108,8 @@
   border-radius: 9999px;
 }
 
-:not(.dark) .bottom-nav__item {
-  color: #71717a;
+.dark .bottom-nav__item {
+  color: #888888;
 }
 
 .bottom-nav__icon-wrapper {
@@ -121,11 +122,11 @@
 }
 
 .bottom-nav__item:hover {
-  color: #d4d4d4;
+  color: #18181b;
 }
 
-:not(.dark) .bottom-nav__item:hover {
-  color: #18181b;
+.dark .bottom-nav__item:hover {
+  color: #d4d4d4;
 }
 
 .bottom-nav__item:hover .bottom-nav__icon-wrapper {
