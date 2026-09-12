@@ -42,7 +42,7 @@ export default function SettingsScreen() {
                     recordTypeId: 'test',
                     activityName: 'Kodlama',
                     activityColor: accentColor || '#ff9100',
-                    activityIcon: 'code',
+                    activityIcon: 'Code',
                     elapsedMinutes: 45,
                     timeStr: '45 dakika',
                     promptedAt: new Date().toISOString()
