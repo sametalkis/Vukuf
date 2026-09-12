@@ -157,7 +157,7 @@ export default function SyncPanel() {
                                     onClick={() => {
                                         void navigator.clipboard.writeText(mcp.url);
                                         setMcp({ ...mcp, copied: true });
-                                        const claudeUrl = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent('Simple Time Tracker')}&connectorUrl=${encodeURIComponent(mcp.url)}`;
+                                        const claudeUrl = `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent('Vukuf')}&connectorUrl=${encodeURIComponent(mcp.url)}`;
                                         window.open(claudeUrl, '_blank', 'noopener,noreferrer');
                                         setTimeout(() => setMcp(prev => prev ? { ...prev, copied: false } : null), 2000);
                                     }}
@@ -171,7 +171,7 @@ export default function SyncPanel() {
                                     onClick={() => {
                                         void navigator.clipboard.writeText(mcp.url);
                                         setMcp({ ...mcp, copied: true });
-                                        const chatgptUrl = `https://chatgpt.com/plugins#settings/Connectors?create-connector=true&name=${encodeURIComponent('Simple Time Tracker')}&url=${encodeURIComponent(mcp.url)}&connectorName=${encodeURIComponent('Simple Time Tracker')}&connectorUrl=${encodeURIComponent(mcp.url)}&redirectAfter=%2Fplugins`;
+                                        const chatgptUrl = `https://chatgpt.com/plugins#settings/Connectors?create-connector=true&name=${encodeURIComponent('Vukuf')}&url=${encodeURIComponent(mcp.url)}&connectorName=${encodeURIComponent('Vukuf')}&connectorUrl=${encodeURIComponent(mcp.url)}&redirectAfter=%2Fplugins`;
                                         window.open(chatgptUrl, '_blank', 'noopener,noreferrer');
                                         setTimeout(() => setMcp(prev => prev ? { ...prev, copied: false } : null), 2000);
                                     }}
@@ -190,7 +190,7 @@ export default function SyncPanel() {
                                 </summary>
                                 <ol className="list-decimal list-inside space-y-1 mt-2 text-xs text-gray-600 dark:text-gray-400 pl-1 leading-relaxed">
                                     <li>Yukarıdaki <strong>ChatGPT Plugins Aç</strong> butonuna tıklayın (veya Profil → Developer Mode → Plugins → Add Plugin açın).</li>
-                                    <li><strong>Name:</strong> <code>Simple Time Tracker</code> yazın.</li>
+                                    <li><strong>Name:</strong> <code>Vukuf</code> yazın.</li>
                                     <li><strong>Connection:</strong> <code>Server URL</code> seçin ve kopyaladığınız adresi yapıştırın.</li>
                                     <li><strong>Authentication:</strong> <code>No Auth</code> seçin (Erişim anahtarlarınız URL parametresinde şifreli taşınır).</li>
                                     <li>Onay kutucuğunu işaretleyip <strong>Create</strong> deyin.</li>
@@ -217,7 +217,7 @@ export default function SyncPanel() {
                                     <pre className="p-2.5 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 font-mono text-[11px] overflow-x-auto text-gray-800 dark:text-gray-200">
 {JSON.stringify({
   mcpServers: {
-    "simple-time-tracker": {
+    "vukuf": {
       url: mcp.url
     }
   }
@@ -243,13 +243,13 @@ export default function SyncPanel() {
                 {status.role === 'admin' && <details><summary className="text-sm font-semibold cursor-pointer">Kurtarma ve güvenlik</summary><div className="space-y-3 pt-3">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Kurtarma dosyası ve kodunu birlikte saklayın. Bu paket zaman kayıtlarının yedeği değildir.</p>
                     <button className={button} disabled={status.busy} onClick={() => { void run(async () => setRecovery(await recoveryPackage())); }}>Kurtarma paketi oluştur</button>
-                    {recovery && <div className="space-y-2"><label className="block text-sm">Kurtarma kodu<input className={input} readOnly value={recovery.code} /></label><button className={button} onClick={() => downloadText(recovery.file, 'simple-time-tracker-recovery-v1.json')}><Download size={16} /> Kurtarma dosyasını indir</button><button className={button} onClick={() => setRecovery(null)}><Check size={16} /> Sakladım, gizle</button></div>}
+                    {recovery && <div className="space-y-2"><label className="block text-sm">Kurtarma kodu<input className={input} readOnly value={recovery.code} /></label><button className={button} onClick={() => downloadText(recovery.file, 'vukuf-recovery-v1.json')}><Download size={16} /> Kurtarma dosyasını indir</button><button className={button} onClick={() => setRecovery(null)}><Check size={16} /> Sakladım, gizle</button></div>}
                     <button className={button} disabled={status.busy} onClick={() => { if (confirm('Anahtar yenilensin mi? Diğer cihazların erişimi kapanacak. Yeniden eşleştirme ve yeni kurtarma paketi gerekecek.')) void run(async () => { await rotateKey(); setRecovery(null); setInvite(null); }); }}>Anahtarı yenile</button>
                     <button className={`${button} text-red-700 dark:text-red-300`} disabled={status.busy} onClick={() => { if (confirm('Buluttaki kasayı kalıcı olarak silmek istiyor musunuz? Cihazlardaki yerel kayıtlar korunur.')) void run(deleteVault); }}>Bulut kasasını sil</button>
                 </div></details>}
                 <button className={button} disabled={status.busy} onClick={() => { if (confirm('Bu cihazın bağlantısı kaldırılsın mı? Gönderilmemiş kayıtlar buluta ulaşmaz. Yerel kayıtlar korunur. Tek cihazınızsa önce kurtarma paketinizi saklayın.')) void run(async () => { await disconnect(); setInvite(null); setRecovery(null); }); }}><Unplug size={16} /> Bu cihazın bağlantısını kaldır</button>
             </>}
-            <button className="text-xs underline underline-offset-4 text-gray-600 dark:text-gray-400 block" onClick={() => { void run(async () => { const backup = await latestBackup(); if (!backup) throw new Error('Geçiş yedeği bulunamadı.'); downloadText(JSON.stringify(JSON.parse(backup).state, null, 2), 'simple-time-tracker-local-backup.json'); }); }}>Geçiş öncesi yerel yedeği indir</button>
+            <button className="text-xs underline underline-offset-4 text-gray-600 dark:text-gray-400 block" onClick={() => { void run(async () => { const backup = await latestBackup(); if (!backup) throw new Error('Geçiş yedeği bulunamadı.'); downloadText(JSON.stringify(JSON.parse(backup).state, null, 2), 'vukuf-local-backup.json'); }); }}>Geçiş öncesi yerel yedeği indir</button>
             {status.conflicts.length > 0 && <div className="space-y-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="text-sm font-bold text-amber-700 dark:text-amber-300">{status.conflicts.length} kayıt incelenmeli</h3>

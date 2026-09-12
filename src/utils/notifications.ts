@@ -98,7 +98,7 @@ export async function sendActivityNotification(
         body,
         icon: '/favicon.svg',
         badge: '/favicon.svg',
-        tag: 'simple-time-tracker-reminder',
+        tag: 'vukuf-reminder',
         vibrate: [200, 100, 200],
         actions: actions || [
             { action: 'stop', title: '⏹️ Hayır, Durdur' },

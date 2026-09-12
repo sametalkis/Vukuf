@@ -241,7 +241,7 @@ export default function StatisticsExportModal({
         if (!imageUrl) return;
         const link = document.createElement('a');
         const fileNameSafe = createFileSlug(periodTitle) || 'istatistik';
-        link.download = `simple-time-tracker-${fileNameSafe}-${new Date().toISOString().slice(0, 10)}.png`;
+        link.download = `vukuf-${fileNameSafe}-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = imageUrl;
         document.body.appendChild(link);
         link.click();
@@ -258,7 +258,7 @@ export default function StatisticsExportModal({
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
-                    title: `Simple Time Tracker - ${periodTitle}`,
+                    title: `Vukuf - ${periodTitle}`,
                     text: `${periodTitle} zaman takibi istatistikleri: Toplam ${formatDuration(totalDuration)}`,
                     files: [file],
                 });

@@ -51,7 +51,7 @@ async function handleMcpRequest(req: Request, env: Env): Promise<Response> {
 
     if (req.method === 'GET') {
         return new Response(JSON.stringify({
-            name: 'Simple Time Tracker MCP Server',
+            name: 'Vukuf MCP Server',
             version: '1.0.0',
             status: 'ready',
             authenticated: !!(vaultId && deviceId && token && secretKey),

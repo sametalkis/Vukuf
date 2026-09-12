@@ -248,7 +248,7 @@ describe('MCP Tools Lifecycle & Dispatcher', () => {
         const initRes = await processMcpRpc({ jsonrpc: '2.0', id: 1, method: 'initialize' }, dummyCtx);
         expect(initRes?.result).toMatchObject({
             protocolVersion: '2024-11-05',
-            serverInfo: { name: 'Simple Time Tracker MCP Server' },
+            serverInfo: { name: 'Vukuf MCP Server' },
         });
 
         // tools/list

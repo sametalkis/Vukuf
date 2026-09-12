@@ -942,7 +942,7 @@ export async function processMcpRpc(
                     tools: {},
                 },
                 serverInfo: {
-                    name: 'Simple Time Tracker MCP Server',
+                    name: 'Vukuf MCP Server',
                     version: '1.0.0',
                 },
             },

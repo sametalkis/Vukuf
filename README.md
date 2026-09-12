@@ -1,11 +1,11 @@
 <div align="center">
-    <img src="public/icon.svg" alt="Simple Time Tracker Logo" height="128" width="128"/>
+    <img src="public/icon.svg" alt="Vukuf Logo" height="128" width="128"/>
     <h1>
-        <b>Simple Time Tracker</b>
+        <b>Vukuf</b>
     </h1>
-    PWA uyumlu, yerel depolama (localStorage) tabanlı, modern, akıcı ve minimalist zaman takip uygulaması.
+    PWA uyumlu, sıfır-bilgi E2EE senkronizasyonlu, MCP destekli, modern ve minimalist zaman takip uygulaması.
     <br>
-    Tüm veriler tamamen cihazınızda saklanır; sunucu ve telemetri bağlantısı bulunmaz.
+    Tüm veriler tamamen cihazınızda şifreli saklanır; gizlilik ve farkındalık odaklıdır.
 </div>
 
 <br>
@@ -44,7 +44,7 @@ Uygulamayı tarayıcınız üzerinden doğrudan kullanmak veya mobil/masaüstü 
 
 ## Genel Bakış
 
-**Simple Time Tracker**, günlük aktivitelerinizi ve alışkanlıklarınızı zahmetsizce kaydetmeniz için tasarlanmış modern, minimalist ve gizlilik odaklı (local-first) bir zaman takip uygulamasıdır. 
+**Vukuf**, günlük aktivitelerinizi ve zaman akışınızı derin bir farkındalıkla kaydetmeniz için tasarlanmış modern, minimalist ve gizlilik odaklı (local-first) bir zaman takip uygulamasıdır. 
 
 Zamanı sadece ne kadar harcadığınızla değil, nasıl bir ritim içinde geçirdiğinizle de değerlendirir. Tek dokunuşla sayaç başlatma/durdurma kolaylığının yanı sıra; aktiviteler arası boşlukları tespit etme (**Untracked Time**), birbirini tetikleyen alışkanlık akışlarını analiz etme (**Habit Sequence Flow**), haftalık dağılım ritmini çıkarma ve istikrar serilerini (**Streaks**) takip etme gibi güçlü analitik araçlar sunar.
 

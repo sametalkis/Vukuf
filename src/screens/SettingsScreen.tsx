@@ -78,7 +78,7 @@ export default function SettingsScreen() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `simple-time-tracker-${new Date().toISOString().slice(0, 10)}.json`;
+        a.download = `vukuf-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(url);
     };
@@ -365,7 +365,7 @@ export default function SettingsScreen() {
                                     <span className="text-xs font-semibold font-mono text-gray-500 dark:text-gray-400">v1.0.0</span>
                                 </div>
                                 <div className="px-4 py-3.5 flex items-center justify-between">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">Simple Time Tracker</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">Vukuf</span>
                                     <span className="text-xs font-medium text-gray-600 dark:text-gray-300">PWA & E2EE Web App</span>
                                 </div>
                             </div>

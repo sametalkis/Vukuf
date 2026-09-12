@@ -35,9 +35,9 @@ export default defineConfig({
       workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/mcp/] },
       includeAssets: ['favicon.svg', 'icon.svg'],
       manifest: {
-        name: 'Simple Time Tracker',
-        short_name: 'Time Tracker',
-        description: 'A beautiful Time Tracker application',
+        name: 'Vukuf',
+        short_name: 'Vukuf',
+        description: 'Zamanın ve aktivitelerinin farkında ol',
         theme_color: '#0a0a0a',
         background_color: '#0a0a0a',
         display: 'standalone',
