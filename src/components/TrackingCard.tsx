@@ -81,8 +81,8 @@ export default function TrackingCard({
                     >
                         <DynamicIcon name={icon} size={18} color={contrast} />
                     </div>
-                    <div className="min-w-0">
-                        <p className="text-sm font-bold truncate" style={{ color: contrast }}>
+                    <div className="min-w-0 flex-1">
+                        <p data-export-activity-name className="text-sm font-bold truncate" style={{ color: contrast }}>
                             {name}
                         </p>
                         {subtitleLeft && (
@@ -110,6 +110,7 @@ export default function TrackingCard({
                     </div>
                     {showChevron && (
                         <ChevronRight
+                            data-export-exclude
                             size={16}
                             className="opacity-40 flex-shrink-0 -mr-0.5"
                             style={{ color: contrast }}

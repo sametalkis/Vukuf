@@ -1,132 +1,74 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, Share2, X, Loader2, Check, Clock } from 'lucide-react';
-import { toPng } from 'html-to-image';
-import type { Record as TimeRecord, RecordType, RunningRecord } from '../types';
+import { AlertCircle, Check, Copy, Download, Loader2, RefreshCw, Share2, X } from 'lucide-react';
+import { getFontEmbedCSS, toBlob } from 'html-to-image';
 import type { ViewMode } from './DateSelectorBar';
 import { formatDuration } from '../utils/time';
-import DynamicIcon from './DynamicIcon';
 
 interface StatisticsExportModalProps {
     isOpen: boolean;
     onClose: () => void;
     viewMode: ViewMode;
     selectedDate: Date;
-    stats: {
-        id: string;
-        name: string;
-        color: string;
-        icon: string;
-        duration: number;
-        sessionCount: number;
-        percent: number;
-    }[];
     totalDuration: number;
-    records?: TimeRecord[];
-    recordTypes?: RecordType[];
-    runningRecord?: RunningRecord | null;
+    sourceElement: HTMLElement;
 }
 
-// Convert data URL directly to Blob without re-running html-to-image
-async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
-    const res = await fetch(dataUrl);
-    return await res.blob();
-}
+const MAX_CANVAS_EDGE = 8192;
+const MAX_CANVAS_AREA = 16_000_000;
 
-// 100% Native SVG Donut Chart (instant, zero async delay, no foreignObject, never hangs html-to-image)
-function SvgDonutChart({
-    stats,
-    totalDuration,
-    isDark,
-}: {
-    stats: { id: string; name: string; color: string; percent: number; duration: number }[];
-    totalDuration: number;
-    isDark: boolean;
-}) {
-    const size = 260;
-    const center = size / 2;
-    const strokeW = 32;
-    const r = (size - strokeW) / 2 - 10; // ~104
-    const circumference = 2 * Math.PI * r; // ~653.45
-
-    let accumulatedPercent = 0;
-    const gap = stats.length > 1 ? 1.5 : 0;
-
-    return (
-        <div className="relative flex items-center justify-center my-3">
-            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                {/* Background track */}
-                <circle
-                    cx={center}
-                    cy={center}
-                    r={r}
-                    fill="none"
-                    stroke={isDark ? '#262626' : '#f1f5f9'}
-                    strokeWidth={strokeW}
-                />
-
-                {/* Slices */}
-                {stats.map((item) => {
-                    const itemPercent = Math.max(0, item.percent);
-                    if (itemPercent <= 0) return null;
-
-                    const effectivePercent = Math.max(0.5, itemPercent - gap);
-                    const strokeDasharray = `${(effectivePercent / 100) * circumference} ${circumference}`;
-                    const strokeDashoffset = -((accumulatedPercent + gap / 2) / 100) * circumference;
-
-                    accumulatedPercent += itemPercent;
-
-                    return (
-                        <circle
-                            key={item.id}
-                            cx={center}
-                            cy={center}
-                            r={r}
-                            fill="none"
-                            stroke={item.color}
-                            strokeWidth={strokeW}
-                            strokeDasharray={strokeDasharray}
-                            strokeDashoffset={strokeDashoffset}
-                            strokeLinecap="round"
-                            transform={`rotate(-90 ${center} ${center})`}
-                        />
-                    );
-                })}
-
-                {/* Center text */}
-                <text
-                    x={center}
-                    y={center - 6}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill={isDark ? '#ffffff' : '#0f172a'}
-                    style={{
-                        fontSize: '26px',
-                        fontWeight: 900,
-                        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-                    }}
-                >
-                    {formatDuration(totalDuration)}
-                </text>
-                <text
-                    x={center}
-                    y={center + 20}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill={isDark ? '#737373' : '#94a3b8'}
-                    style={{
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        letterSpacing: '2px',
-                        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-                    }}
-                >
-                    TOTAL
-                </text>
-            </svg>
-        </div>
+function getSafePixelRatio(width: number, height: number): number {
+    return Math.min(
+        2,
+        MAX_CANVAS_EDGE / width,
+        MAX_CANVAS_EDGE / height,
+        Math.sqrt(MAX_CANVAS_AREA / (width * height)),
     );
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const timeoutId = window.setTimeout(
+            () => reject(new Error('Görsel oluşturma zaman aşımına uğradı.')),
+            timeoutMs,
+        );
+
+        promise.then(
+            (value) => {
+                window.clearTimeout(timeoutId);
+                resolve(value);
+            },
+            (error) => {
+                window.clearTimeout(timeoutId);
+                reject(error);
+            },
+        );
+    });
+}
+
+function createFileSlug(value: string): string {
+    return value
+        .toLocaleLowerCase('tr-TR')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/ı/g, 'i')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+function getEffectiveBackgroundColor(node: HTMLElement, fallback: string): string {
+    let current: HTMLElement | null = node;
+
+    while (current) {
+        const backgroundColor = getComputedStyle(current).backgroundColor;
+        if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
+            return backgroundColor;
+        }
+        current = current.parentElement;
+    }
+
+    return fallback;
 }
 
 export default function StatisticsExportModal({
@@ -134,13 +76,16 @@ export default function StatisticsExportModal({
     onClose,
     viewMode,
     selectedDate,
-    stats,
     totalDuration,
+    sourceElement,
 }: StatisticsExportModalProps) {
-    const [isGenerating, setIsGenerating] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(true);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [imageBlob, setImageBlob] = useState<Blob | null>(null);
+    const [generationError, setGenerationError] = useState<string | null>(null);
+    const [generationAttempt, setGenerationAttempt] = useState(0);
     const [copied, setCopied] = useState(false);
-    const exportCardRef = useRef<HTMLDivElement>(null);
+    const objectUrlRef = useRef<string | null>(null);
 
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
@@ -167,75 +112,147 @@ export default function StatisticsExportModal({
         return 'Genel';
     }, [viewMode]);
 
-    // Generate PNG image on modal open
-    useEffect(() => {
-        if (!isOpen) {
-            setImageUrl(null);
-            setIsGenerating(false);
-            return;
+    const generateImage = useCallback(async () => {
+        if (!sourceElement.isConnected) throw new Error('İstatistik görünümü artık ekranda değil.');
+
+        // Freeze the real page before any async work. Only this detached copy
+        // receives export spacing and text wrapping; the live timer keeps running.
+        const node = sourceElement.cloneNode(true) as HTMLElement;
+        const backgroundColor = getEffectiveBackgroundColor(sourceElement, isDark ? '#030712' : '#f3f4f6');
+        const sourceStyle = getComputedStyle(sourceElement);
+        const width = Math.ceil(sourceElement.getBoundingClientRect().width);
+        if (width <= 0) throw new Error('Dışa aktarma görünümü ölçülemedi.');
+
+        Object.assign(node.style, {
+            width: `${width}px`,
+            boxSizing: 'border-box',
+            paddingTop: '20px',
+            paddingBottom: '24px',
+            backgroundColor,
+            fontFamily: sourceStyle.fontFamily,
+            fontSize: sourceStyle.fontSize,
+            lineHeight: sourceStyle.lineHeight,
+            color: sourceStyle.color,
+        });
+        // Preserve inherited accent tokens when moving the snapshot to body.
+        for (const property of sourceStyle) {
+            if (property.startsWith('--')) node.style.setProperty(property, sourceStyle.getPropertyValue(property));
         }
+        node.querySelectorAll('[data-export-exclude], .recharts-tooltip-wrapper').forEach((element) => element.remove());
+        node.querySelectorAll<HTMLElement>('[data-export-activity-name]').forEach((element) => {
+            Object.assign(element.style, {
+                whiteSpace: 'normal',
+                overflow: 'visible',
+                textOverflow: 'clip',
+                overflowWrap: 'anywhere',
+            });
+        });
+
+        const host = document.createElement('div');
+        host.setAttribute('aria-hidden', 'true');
+        host.inert = true;
+        Object.assign(host.style, { position: 'fixed', left: '-10000px', top: '0', pointerEvents: 'none' });
+        host.appendChild(node);
+        document.body.appendChild(host);
+
+        try {
+            let fontEmbedCSS = '';
+            try {
+                // Loaded web fonts are not automatically available inside the SVG
+                // image. Embed them so text keeps its original metrics in PNG.
+                fontEmbedCSS = await withTimeout(getFontEmbedCSS(node, { preferredFontFormat: 'woff2' }), 4000);
+            } catch {
+                // Offline export remains available using the system font below.
+            }
+            if (!fontEmbedCSS) {
+                node.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+            }
+            if ('fonts' in document) {
+                await withTimeout(document.fonts.ready, 3000).catch(() => undefined);
+            }
+
+            const height = Math.ceil(node.getBoundingClientRect().height);
+            const blob = await withTimeout(
+                toBlob(node, {
+                    pixelRatio: getSafePixelRatio(width, height),
+                    fontEmbedCSS,
+                    skipFonts: !fontEmbedCSS,
+                    backgroundColor,
+                    width,
+                    height,
+                }),
+                15_000,
+            );
+            if (!blob) throw new Error('Tarayıcı PNG verisi oluşturamadı.');
+            return blob;
+        } finally {
+            host.remove();
+        }
+    }, [isDark, sourceElement]);
+
+    useEffect(() => {
+        if (!isOpen) return;
 
         let isMounted = true;
-        setIsGenerating(true);
 
-        const generate = async () => {
-            try {
-                // Short wait to allow the DOM node to attach and paint
-                await new Promise((r) => setTimeout(r, 120));
+        generateImage()
+            .then((blob) => {
+                if (!isMounted) return;
 
-                if (!exportCardRef.current || !isMounted) return;
-
-                // 3-second timeout protection to ensure it NEVER hangs indefinitely
-                const timeoutPromise = new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('Export timed out')), 3500)
-                );
-
-                const dataUrl = await Promise.race([
-                    toPng(exportCardRef.current, {
-                        pixelRatio: 2,
-                        quality: 0.95,
-                        cacheBust: true,
-                        skipFonts: true, // Prevents hanging on external web font fetches
-                        backgroundColor: isDark ? '#0d0d0d' : '#f8fafc',
-                    }),
-                    timeoutPromise,
-                ]);
-
-                if (isMounted) {
-                    setImageUrl(dataUrl);
-                    setIsGenerating(false);
-                }
-            } catch (err) {
-                console.error('Failed to generate page image:', err);
-                if (isMounted) {
-                    setIsGenerating(false);
-                }
-            }
-        };
-
-        generate();
+                if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+                const nextUrl = URL.createObjectURL(blob);
+                objectUrlRef.current = nextUrl;
+                setImageBlob(blob);
+                setImageUrl(nextUrl);
+                setGenerationError(null);
+            })
+            .catch((error: unknown) => {
+                if (!isMounted) return;
+                console.error('Failed to generate statistics image:', error);
+                setGenerationError(error instanceof Error ? error.message : 'Görsel oluşturulamadı.');
+            })
+            .finally(() => {
+                if (isMounted) setIsGenerating(false);
+            });
 
         return () => {
             isMounted = false;
         };
-    }, [isOpen, viewMode, selectedDate, stats, totalDuration, isDark]);
+    }, [generateImage, generationAttempt, isOpen]);
+
+    useEffect(() => () => {
+        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    }, []);
+
+    const handleRetry = () => {
+        if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+            objectUrlRef.current = null;
+        }
+        setImageUrl(null);
+        setImageBlob(null);
+        setGenerationError(null);
+        setIsGenerating(true);
+        setGenerationAttempt((attempt) => attempt + 1);
+    };
 
     // Download Handler
     const handleDownload = () => {
         if (!imageUrl) return;
         const link = document.createElement('a');
-        const fileNameSafe = periodTitle.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        const fileNameSafe = createFileSlug(periodTitle) || 'istatistik';
         link.download = `simple-time-tracker-${fileNameSafe}-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = imageUrl;
+        document.body.appendChild(link);
         link.click();
+        link.remove();
     };
 
     // Native Web Share Handler
     const handleShare = async () => {
-        if (!imageUrl) return;
+        if (!imageBlob) return;
         try {
-            const blob = await dataUrlToBlob(imageUrl);
-            const file = new File([blob], `istatistik-${periodTitle.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`, {
+            const file = new File([imageBlob], `istatistik-${createFileSlug(periodTitle) || 'ozet'}.png`, {
                 type: 'image/png',
             });
 
@@ -248,18 +265,18 @@ export default function StatisticsExportModal({
             } else {
                 handleDownload();
             }
-        } catch {
+        } catch (error: unknown) {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             handleDownload();
         }
     };
 
     // Copy to clipboard
     const handleCopyImage = async () => {
-        if (!imageUrl) return;
+        if (!imageBlob) return;
         try {
-            const blob = await dataUrlToBlob(imageUrl);
             if (navigator.clipboard && 'write' in navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-                const item = new ClipboardItem({ 'image/png': blob });
+                const item = new ClipboardItem({ 'image/png': imageBlob });
                 await navigator.clipboard.write([item]);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);
@@ -318,6 +335,7 @@ export default function StatisticsExportModal({
                         <button
                             type="button"
                             onClick={onClose}
+                            aria-label="Dışa aktarma penceresini kapat"
                             className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
                         >
                             <X size={18} />
@@ -351,12 +369,27 @@ export default function StatisticsExportModal({
                                     💡 İpucu: Mobilde görselin üzerine basılı tutarak doğrudan galerinize kaydedebilirsiniz.
                                 </p>
                             </div>
-                        ) : (
-                            <div className="text-center py-10">
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    Görsel oluşturulamadı. Lütfen tekrar deneyin.
+                        ) : generationError ? (
+                            <div className="flex flex-col items-center text-center py-10 max-w-xs">
+                                <AlertCircle size={28} className="text-red-500 mb-3" />
+                                <p className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                                    Görsel oluşturulamadı
                                 </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-4">
+                                    {generationError} Tekrar deneyebilir veya pencereyi kapatıp yeniden açabilirsiniz.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={handleRetry}
+                                    className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white"
+                                    style={{ backgroundColor: 'var(--primary, #ff9100)' }}
+                                >
+                                    <RefreshCw size={15} />
+                                    Tekrar Dene
+                                </button>
                             </div>
+                        ) : (
+                            <div className="text-sm text-gray-500 dark:text-gray-400 py-10">Önizleme hazır değil.</div>
                         )}
                     </div>
 
@@ -365,7 +398,7 @@ export default function StatisticsExportModal({
                         <button
                             type="button"
                             onClick={handleDownload}
-                            disabled={isGenerating || !imageUrl}
+                            disabled={isGenerating || !imageBlob}
                             className="flex-1 py-3 px-4 rounded-2xl font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
                             style={{
                                 backgroundColor: 'var(--primary, #ff9100)',
@@ -379,7 +412,7 @@ export default function StatisticsExportModal({
                         <button
                             type="button"
                             onClick={handleShare}
-                            disabled={isGenerating || !imageUrl}
+                            disabled={isGenerating || !imageBlob}
                             className="py-3 px-4 rounded-2xl font-bold text-sm bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-750 text-gray-700 dark:text-gray-200 border border-gray-200/60 dark:border-neutral-700/60 transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             <Share2 size={16} />
@@ -389,116 +422,15 @@ export default function StatisticsExportModal({
                         <button
                             type="button"
                             onClick={handleCopyImage}
-                            disabled={isGenerating || !imageUrl}
+                            disabled={isGenerating || !imageBlob}
                             className="py-3 px-3 rounded-2xl font-bold text-sm bg-gray-100 dark:bg-neutral-800 hover:bg-gray-200 dark:hover:bg-neutral-750 text-gray-700 dark:text-gray-200 border border-gray-200/60 dark:border-neutral-700/60 transition-all duration-200 active:scale-[0.98] flex items-center justify-center disabled:opacity-50"
                             title="Panoya Kopyala"
                         >
-                            {copied ? <Check size={16} className="text-emerald-500" /> : <Clock size={16} />}
+                            {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
                         </button>
                     </div>
                 </motion.div>
 
-                {/* ── OFF-SCREEN DEDICATED SNAPSHOT TEMPLATE (Circle + Activities) ── */}
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        zIndex: -9999,
-                        opacity: 0,
-                        pointerEvents: 'none',
-                    }}
-                >
-                    <div
-                        ref={exportCardRef}
-                        style={{ width: '430px' }}
-                        className={`p-6 rounded-[32px] font-sans ${
-                            isDark ? 'dark bg-[#0d0d0d] text-white' : 'bg-[#f8fafc] text-gray-900'
-                        } border border-gray-200/80 dark:border-neutral-800 shadow-2xl space-y-4`}
-                    >
-                        {/* 1. Header with Period & Branding */}
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-neutral-800">
-                            <div>
-                                <h1 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">
-                                    İstatistikler
-                                </h1>
-                                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 mt-0.5">
-                                    {periodTitle}
-                                </p>
-                            </div>
-
-                            <span
-                                className="text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider"
-                                style={{
-                                    backgroundColor: 'var(--primary-soft, rgba(255,145,0,0.15))',
-                                    color: 'var(--primary, #ff9100)',
-                                }}
-                            >
-                                {periodBadge}
-                            </span>
-                        </div>
-
-                        {/* 2. Donut Chart (İstatistik Circle'ı) */}
-                        <SvgDonutChart
-                            stats={stats}
-                            totalDuration={totalDuration}
-                            isDark={isDark}
-                        />
-
-                        {/* 3. Section Header */}
-                        <div className="flex items-center justify-between pt-1 mb-1">
-                            <span className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                                Activities
-                            </span>
-                            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-200/70 dark:bg-neutral-800 px-2.5 py-0.5 rounded-full">
-                                {stats.length} {stats.length === 1 ? 'activity' : 'activities'}
-                            </span>
-                        </div>
-
-                        {/* 4. Activities List Matching the Screen */}
-                        <div className="space-y-2">
-                            {stats.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="p-3 rounded-2xl bg-white dark:bg-[#161616] border border-gray-100 dark:border-neutral-800/80 shadow-xs flex items-center justify-between"
-                                >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <div
-                                            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white shadow-xs"
-                                            style={{ backgroundColor: item.color }}
-                                        >
-                                            <DynamicIcon name={item.icon} size={20} color="#ffffff" />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
-                                                {item.name}
-                                            </p>
-                                            <span className="text-xs text-gray-400 dark:text-gray-500 font-semibold">
-                                                %{Math.round(item.percent)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <div className="text-right">
-                                        <span className="text-sm font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                                            {formatDuration(item.duration)}
-                                        </span>
-                                        <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-                                            {item.sessionCount} {item.sessionCount === 1 ? 'session' : 'sessions'}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* 5. Minimal Branding Footer */}
-                        <div className="pt-2 text-center border-t border-gray-100 dark:border-neutral-800/80">
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">
-                                Simple Time Tracker
-                            </p>
-                        </div>
-                    </div>
-                </div>
             </div>
         </AnimatePresence>,
         document.body

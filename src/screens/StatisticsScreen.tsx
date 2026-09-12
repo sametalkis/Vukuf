@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useStore } from '../store/useStore';
 import { formatDuration, splitRecordByDays } from '../utils/time';
@@ -38,6 +38,13 @@ interface CustomTooltipProps {
     payload?: { name: string; value: number; payload: { color: string } }[];
 }
 
+interface StatisticsExportSnapshot {
+    viewMode: ViewMode;
+    selectedDate: Date;
+    totalDuration: number;
+    sourceElement: HTMLDivElement;
+}
+
 function CustomTooltip({ active, payload }: CustomTooltipProps) {
     if (!active || !payload?.length) return null;
     return (
@@ -67,7 +74,8 @@ export default function StatisticsScreen() {
     } | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<(TimeRecord & { isRunning?: boolean }) | null>(null);
-    const [isExportOpen, setIsExportOpen] = useState(false);
+    const [exportSnapshot, setExportSnapshot] = useState<StatisticsExportSnapshot | null>(null);
+    const exportAreaRef = useRef<HTMLDivElement>(null);
 
     const periodSubtitle = useMemo(() => {
         if (viewMode === 'day') {
@@ -197,7 +205,7 @@ export default function StatisticsScreen() {
                     </div>
                 </div>
             ) : (
-                <div className="px-4">
+                <div ref={exportAreaRef} className="px-4">
                     {/* Screen Header with Period & Image Export Button */}
                     <div className="flex items-center justify-between pt-1 pb-1 mb-2 px-1">
                         <div>
@@ -210,8 +218,17 @@ export default function StatisticsScreen() {
                         </div>
 
                         <button
+                            data-export-exclude
                             type="button"
-                            onClick={() => setIsExportOpen(true)}
+                            onClick={() => {
+                                if (!exportAreaRef.current) return;
+                                setExportSnapshot({
+                                    viewMode,
+                                    selectedDate: new Date(selectedDate),
+                                    totalDuration,
+                                    sourceElement: exportAreaRef.current,
+                                });
+                            }}
                             className="w-10 h-10 rounded-2xl bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-200 border border-gray-200/80 dark:border-neutral-800 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
                             title="Paylaş"
                             aria-label="Paylaş"
@@ -267,7 +284,7 @@ export default function StatisticsScreen() {
                     {/* Section Header */}
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Activities</span>
-                        <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-0.5 rounded-full">
+                        <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
                             {stats.length} {stats.length === 1 ? 'activity' : 'activities'}
                         </span>
                     </div>
@@ -316,17 +333,16 @@ export default function StatisticsScreen() {
             )}
 
             {/* Statistics Single-Page Image Export Modal */}
-            <StatisticsExportModal
-                isOpen={isExportOpen}
-                onClose={() => setIsExportOpen(false)}
-                viewMode={viewMode}
-                selectedDate={selectedDate}
-                stats={stats}
-                totalDuration={totalDuration}
-                records={records}
-                recordTypes={recordTypes}
-                runningRecord={runningRecord}
-            />
+            {exportSnapshot && (
+                <StatisticsExportModal
+                    isOpen
+                    onClose={() => setExportSnapshot(null)}
+                    viewMode={exportSnapshot.viewMode}
+                    selectedDate={exportSnapshot.selectedDate}
+                    totalDuration={exportSnapshot.totalDuration}
+                    sourceElement={exportSnapshot.sourceElement}
+                />
+            )}
 
             <DateSelectorBar
                 viewMode={viewMode}
