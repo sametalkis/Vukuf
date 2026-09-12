@@ -71,6 +71,11 @@ export default function DateSelectorBar({
         return items;
     }, [viewMode, selectedDate, records]);
 
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStartXRef = useRef(0);
+    const dragScrollLeftRef = useRef(0);
+    const hasDraggedRef = useRef(false);
+
     // Auto-scroll to most recent on mount/mode change — instant, no smooth animation
     useEffect(() => {
         requestAnimationFrame(() => {
@@ -78,6 +83,57 @@ export default function DateSelectorBar({
             if (el) el.scrollLeft = el.scrollWidth;
         });
     }, [viewMode]);
+
+    // Mouse wheel horizontal scrolling (passive: false to prevent background vertical page scroll)
+    useEffect(() => {
+        const el = scrollContainerRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            if (el.scrollWidth <= el.clientWidth) return;
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && e.deltaY !== 0) {
+                e.preventDefault();
+                el.scrollLeft += e.deltaY;
+            }
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, []);
+
+    // Mouse click-and-drag horizontal scrolling
+    useEffect(() => {
+        if (!isDragging) return;
+        const onMouseMove = (e: MouseEvent) => {
+            const el = scrollContainerRef.current;
+            if (!el) return;
+            const dx = e.pageX - dragStartXRef.current;
+            if (Math.abs(dx) > 4) {
+                hasDraggedRef.current = true;
+            }
+            el.scrollLeft = dragScrollLeftRef.current - dx;
+        };
+        const onMouseUp = () => {
+            setIsDragging(false);
+            setTimeout(() => {
+                hasDraggedRef.current = false;
+            }, 50);
+        };
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+    }, [isDragging]);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (e.button !== 0) return;
+        const el = scrollContainerRef.current;
+        if (!el) return;
+        setIsDragging(true);
+        dragStartXRef.current = e.pageX;
+        dragScrollLeftRef.current = el.scrollLeft;
+        hasDraggedRef.current = false;
+    };
 
     const handleRangeSelect = useCallback((id: string) => {
         setViewMode(id as ViewMode);
@@ -97,7 +153,10 @@ export default function DateSelectorBar({
                 {/* Horizontal Date Scroller */}
                 <div
                     ref={scrollContainerRef}
-                    className="flex-1 flex items-center gap-1.5 px-2.5 py-2 overflow-x-auto no-scrollbar"
+                    onMouseDown={handleMouseDown}
+                    className={`flex-1 flex items-center gap-1.5 px-2.5 py-2 overflow-x-auto no-scrollbar select-none ${
+                        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                    }`}
                 >
                     {viewMode === 'all' ? (
                         <div className="flex-1 text-center text-sm font-semibold text-gray-500 py-3">
@@ -107,8 +166,13 @@ export default function DateSelectorBar({
                         selectorItems.map((item, idx) => (
                             <button
                                 key={idx}
-                                onClick={() => setSelectedDate(item.date)}
-                                className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[3.25rem] px-3 py-2 rounded-xl transition-all ${item.isSelected
+                                onClick={() => {
+                                    if (hasDraggedRef.current) return;
+                                    setSelectedDate(item.date);
+                                }}
+                                className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[3.25rem] px-3 py-2 rounded-xl transition-all ${
+                                    isDragging ? 'cursor-grabbing' : 'cursor-pointer'
+                                } ${item.isSelected
                                     ? 'shadow-md scale-105 font-bold'
                                     : 'text-gray-500 hover:bg-gray-200/50 dark:hover:bg-neutral-800/50'
                                     }`}
