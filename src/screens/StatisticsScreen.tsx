@@ -8,7 +8,6 @@ import { Share2 } from 'lucide-react';
 import DynamicIcon from '../components/DynamicIcon';
 import TrackingCard from '../components/TrackingCard';
 import ActivityDetailModal from '../components/ActivityDetailModal';
-import ActivityHeatmap from '../components/ActivityHeatmap';
 import StatisticsExportModal from '../components/StatisticsExportModal';
 import EditRecordScreen from '../components/EditRecordScreen';
 import type { Record as TimeRecord } from '../types';
@@ -264,17 +263,6 @@ export default function StatisticsScreen() {
                             <span className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-1">total</span>
                         </div>
                     </div>
-
-                    {/* GitHub-style Activity Heatmap (hidden in 'day', shown in 'month' & 'year') */}
-                    {viewMode !== 'day' && (
-                        <ActivityHeatmap
-                            viewMode={viewMode}
-                            selectedDate={selectedDate}
-                            records={records}
-                            recordTypes={recordTypes}
-                            runningRecord={runningRecord}
-                        />
-                    )}
 
                     {/* Section Header */}
                     <div className="flex items-center justify-between mb-2">

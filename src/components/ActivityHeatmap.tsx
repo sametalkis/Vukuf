@@ -10,6 +10,9 @@ interface ActivityHeatmapProps {
     records: TimeRecord[];
     recordTypes: RecordType[];
     runningRecord: RunningRecord | null;
+    customColor?: string;
+    title?: string;
+    className?: string;
 }
 
 interface DayData {
@@ -35,27 +38,26 @@ function formatDateKey(d: Date): string {
 
 function getLevel(durationSec: number, maxSec: number): 0 | 1 | 2 | 3 | 4 {
     if (durationSec <= 0) return 0;
-    const q1 = Math.min(3600, Math.max(900, maxSec * 0.25));
-    const q2 = Math.min(10800, Math.max(3600, maxSec * 0.50));
-    const q3 = Math.min(21600, Math.max(7200, maxSec * 0.75));
-
-    if (durationSec < q1) return 1;
-    if (durationSec < q2) return 2;
-    if (durationSec < q3) return 3;
+    if (maxSec <= 0) return 1;
+    const ratio = durationSec / maxSec;
+    if (ratio < 0.25) return 1;
+    if (ratio < 0.5) return 2;
+    if (ratio < 0.75) return 3;
     return 4;
 }
 
 // Background style for intensity levels
-function getLevelBg(level: 0 | 1 | 2 | 3 | 4): string {
+function getLevelBg(level: 0 | 1 | 2 | 3 | 4, customColor?: string): string {
+    const base = customColor || 'var(--primary, #ff9100)';
     switch (level) {
         case 1:
-            return 'color-mix(in srgb, var(--primary, #ff9100) 25%, transparent)';
+            return `color-mix(in srgb, ${base} 25%, transparent)`;
         case 2:
-            return 'color-mix(in srgb, var(--primary, #ff9100) 50%, transparent)';
+            return `color-mix(in srgb, ${base} 50%, transparent)`;
         case 3:
-            return 'color-mix(in srgb, var(--primary, #ff9100) 75%, transparent)';
+            return `color-mix(in srgb, ${base} 75%, transparent)`;
         case 4:
-            return 'var(--primary, #ff9100)';
+            return base;
         case 0:
         default:
             return '';
@@ -68,6 +70,9 @@ export default function ActivityHeatmap({
     records,
     recordTypes,
     runningRecord,
+    customColor,
+    title,
+    className,
 }: ActivityHeatmapProps) {
     // Hidden in daily view
     if (viewMode === 'day') return null;
@@ -311,23 +316,23 @@ export default function ActivityHeatmap({
     }, [viewMode, monthGridData, yearGridData, allTrackedDaysCount]);
 
     return (
-        <section className="mt-6 mb-2">
-            <div className="p-4 rounded-3xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm space-y-3.5">
+        <section className="w-full">
+            <div className={className || "p-4 rounded-3xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm space-y-3.5"}>
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div
                             className="w-8 h-8 rounded-xl flex items-center justify-center text-xs"
                             style={{
-                                backgroundColor: 'var(--primary-soft, rgba(255, 145, 0, 0.15))',
-                                color: 'var(--primary, #ff9100)',
+                                backgroundColor: customColor ? `${customColor}22` : 'var(--primary-soft, rgba(255, 145, 0, 0.15))',
+                                color: customColor || 'var(--primary, #ff9100)',
                             }}
                         >
                             <Calendar size={16} />
                         </div>
                         <div>
                             <h3 className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
-                                {viewMode === 'year' ? 'Commit & Activity Heatmap' : 'Monthly Activity Heatmap'}
+                                {title || (viewMode === 'year' ? 'Commit & Activity Heatmap' : 'Monthly Activity Heatmap')}
                             </h3>
                             <p className="text-[11px] text-gray-400 dark:text-gray-500">
                                 {periodActiveDays} active days • {bestStreak > 0 ? `Streak: ${bestStreak}d` : 'Daily consistency'}
@@ -387,7 +392,7 @@ export default function ActivityHeatmap({
                                                 }
 
                                                 const isSelected = selectedDay?.dateKey === day.dateKey;
-                                                const bg = getLevelBg(day.level);
+                                                const bg = getLevelBg(day.level, customColor);
 
                                                 return (
                                                     <button
@@ -453,7 +458,7 @@ export default function ActivityHeatmap({
                                 }
 
                                 const isSelected = selectedDay?.dateKey === day.dateKey;
-                                const bg = getLevelBg(day.level);
+                                const bg = getLevelBg(day.level, customColor);
 
                                 return (
                                     <button
@@ -594,27 +599,24 @@ export default function ActivityHeatmap({
                         <span
                             className="w-2.5 h-2.5 rounded-[2px]"
                             style={{
-                                backgroundColor:
-                                    'color-mix(in srgb, var(--primary, #ff9100) 25%, transparent)',
+                                backgroundColor: getLevelBg(1, customColor),
                             }}
                         />
                         <span
                             className="w-2.5 h-2.5 rounded-[2px]"
                             style={{
-                                backgroundColor:
-                                    'color-mix(in srgb, var(--primary, #ff9100) 50%, transparent)',
+                                backgroundColor: getLevelBg(2, customColor),
                             }}
                         />
                         <span
                             className="w-2.5 h-2.5 rounded-[2px]"
                             style={{
-                                backgroundColor:
-                                    'color-mix(in srgb, var(--primary, #ff9100) 75%, transparent)',
+                                backgroundColor: getLevelBg(3, customColor),
                             }}
                         />
                         <span
                             className="w-2.5 h-2.5 rounded-[2px]"
-                            style={{ backgroundColor: 'var(--primary, #ff9100)' }}
+                            style={{ backgroundColor: getLevelBg(4, customColor) }}
                         />
                         <span className="text-[10px] ml-0.5">More</span>
                     </div>

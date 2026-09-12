@@ -25,6 +25,7 @@ import {
 import type { Record as TimeRecord } from '../types';
 import type { ViewMode } from './DateSelectorBar';
 import DynamicIcon from './DynamicIcon';
+import ActivityHeatmap from './ActivityHeatmap';
 import { getContrastColor } from '../utils/colors';
 import { formatDuration } from '../utils/time';
 import { useStore } from '../store/useStore';
@@ -66,7 +67,13 @@ export default function ActivityDetailModal({
     activityRecords,
     onSelectRecord,
 }: ActivityDetailModalProps) {
-    const { recordTypes, records: allStoreRecords } = useStore();
+    const { recordTypes, records: allStoreRecords, runningRecord } = useStore();
+
+    // All store records for this activity across time (for full streak and heatmap tracking)
+    const activityAllRecords = useMemo(() => {
+        if (!activity) return [];
+        return allStoreRecords.filter((r) => r.recordTypeId === activity.id);
+    }, [activity, allStoreRecords]);
 
     // Close on Escape key
     useEffect(() => {
@@ -774,6 +781,20 @@ export default function ActivityDetailModal({
                                 </div>
                             )}
                         </div>
+
+                        {/* ── Activity Heatmap (GitHub-style Commit Frequency) ── */}
+                        {viewMode !== 'day' && (
+                            <ActivityHeatmap
+                                viewMode={viewMode}
+                                selectedDate={selectedDate}
+                                records={activityAllRecords}
+                                recordTypes={recordTypes}
+                                runningRecord={runningRecord?.recordTypeId === activity.id ? runningRecord : null}
+                                customColor={activity.color}
+                                title={`${activity.name} • ${viewMode === 'year' ? 'Yıllık Dağılım' : 'Aylık Dağılım'}`}
+                                className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3.5"
+                            />
+                        )}
 
                         {/* ── Day of the Week Distribution (Pzt - Paz) ── */}
                         {viewMode !== 'day' && weekdayDistribution.length > 0 && (
