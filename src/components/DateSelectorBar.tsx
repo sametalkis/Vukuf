@@ -87,7 +87,7 @@ export default function DateSelectorBar({
 
     return (
         <div
-            className="fixed left-1/2 -translate-x-1/2 z-40 bg-white/90 dark:bg-[#141414]/90 backdrop-blur-xl border border-black/5 dark:border-white/10 shadow-xl rounded-2xl overflow-hidden"
+            className="fixed left-1/2 -translate-x-1/2 z-40 bg-white/90 dark:bg-[#141414]/90 backdrop-blur-xl border border-black/5 dark:border-white/10 shadow-xl rounded-2xl"
             style={{
                 width: 'min(92vw, 420px)',
                 bottom: 'calc(80px + env(safe-area-inset-bottom, 14px))',
@@ -137,11 +137,17 @@ export default function DateSelectorBar({
                 </div>
 
                 {/* Range Selector (3 dots) */}
-                <div className="flex-shrink-0 px-2 py-2 border-l border-gray-200 dark:border-gray-800 relative">
+                <div className="flex-shrink-0 px-2 py-2 border-l border-gray-200 dark:border-neutral-800 relative">
                     <button
                         onClick={() => setShowRangeMenu(!showRangeMenu)}
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showRangeMenu ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600' : 'text-gray-500 hover:bg-gray-200/50 dark:hover:bg-gray-800/50'
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showRangeMenu
+                            ? 'text-primary-600'
+                            : 'text-gray-500 hover:bg-gray-200/50 dark:hover:bg-neutral-800/50'
                             }`}
+                        style={showRangeMenu ? {
+                            backgroundColor: 'var(--primary-soft, rgba(255, 145, 0, 0.15))',
+                            color: 'var(--primary, #ff9100)',
+                        } : undefined}
                     >
                         <MoreVertical size={20} />
                     </button>
@@ -152,20 +158,27 @@ export default function DateSelectorBar({
                                 className="fixed inset-0 z-40"
                                 onClick={() => setShowRangeMenu(false)}
                             />
-                            <div className="absolute right-4 bottom-14 w-40 bg-white dark:bg-gray-800 rounded-2xl shadow-xl z-50 overflow-hidden border border-gray-100 dark:border-gray-700 font-medium">
-                                {RANGE_OPTIONS.map(item => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => handleRangeSelect(item.id)}
-                                        className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between ${viewMode === item.id
-                                            ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                            }`}
-                                    >
-                                        {item.label}
-                                        {viewMode === item.id && <Check size={16} />}
-                                    </button>
-                                ))}
+                            <div className="absolute right-1 bottom-full mb-3 w-44 bg-white/95 dark:bg-[#1c1c1c]/95 backdrop-blur-xl rounded-2xl shadow-2xl z-50 overflow-hidden border border-black/10 dark:border-white/15 font-medium">
+                                {RANGE_OPTIONS.map(item => {
+                                    const isSelected = viewMode === item.id;
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => handleRangeSelect(item.id)}
+                                            className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between transition-colors ${isSelected
+                                                ? 'font-bold'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/60 dark:hover:bg-neutral-800/60'
+                                                }`}
+                                            style={isSelected ? {
+                                                backgroundColor: 'var(--primary-soft, rgba(255, 145, 0, 0.15))',
+                                                color: 'var(--primary, #ff9100)'
+                                            } : undefined}
+                                        >
+                                            {item.label}
+                                            {isSelected && <Check size={16} style={{ color: 'var(--primary, #ff9100)' }} />}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </>
                     )}
