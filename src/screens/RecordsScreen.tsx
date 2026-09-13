@@ -515,24 +515,65 @@ export default function RecordsScreen() {
         setSelectedIds(new Set());
     }, []);
 
-    const handleBulkMerge = useCallback(() => {
-        if (selectedIds.size < 2) return;
+    // Can merge: 2+ selected, all same activity, and strictly consecutive with no intervening records!
+    const canMerge = useMemo(() => {
+        if (selectedIds.size < 2) return false;
         const ids = Array.from(selectedIds);
         const allAvailable = runningRecord
-            ? [...records, { id: runningRecord.id, recordTypeId: runningRecord.recordTypeId, startTime: runningRecord.startTime, endTime: '', duration: 0 }]
+            ? [...records, { id: runningRecord.id, recordTypeId: runningRecord.recordTypeId, startTime: runningRecord.startTime, endTime: new Date().toISOString(), duration: 0 }]
             : records;
         const selectedRecords = allAvailable.filter((r) => ids.includes(r.id));
+        if (selectedRecords.length < 2) return false;
 
-        // Check all same activity
-        const activities = new Set(selectedRecords.map((r) => r.recordTypeId));
-        if (activities.size > 1) {
-            alert(t('records.mergeRequiresSameActivity'));
-            return;
+        // 1. All same activity
+        const firstType = selectedRecords[0].recordTypeId;
+        if (!selectedRecords.every((r) => r.recordTypeId === firstType)) {
+            return false;
         }
 
+        // 2. Sort all available records chronologically
+        const sortedAll = [...allAvailable].sort(
+            (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
+
+        // Find positions of selected records
+        const indices = ids
+            .map((id) => sortedAll.findIndex((r) => r.id === id))
+            .filter((idx) => idx !== -1)
+            .sort((a, b) => a - b);
+
+        if (indices.length < 2) return false;
+
+        // 3. Must be strictly consecutive (no other records between them)
+        for (let i = 1; i < indices.length; i++) {
+            if (indices[i] !== indices[i - 1] + 1) {
+                return false;
+            }
+        }
+
+        // 4. Time gap between adjacent records must not exceed 5 minutes
+        for (let i = 1; i < indices.length; i++) {
+            const prev = sortedAll[indices[i - 1]];
+            const curr = sortedAll[indices[i]];
+            const prevEnd = new Date(prev.endTime || new Date().toISOString()).getTime();
+            const currStart = new Date(curr.startTime).getTime();
+            if (currStart - prevEnd > 5 * 60 * 1000) {
+                return false;
+            }
+        }
+
+        return true;
+    }, [selectedIds, records, runningRecord]);
+
+    const handleBulkMerge = useCallback(() => {
+        if (!canMerge) {
+            alert(t('records.mergeRequiresConsecutive'));
+            return;
+        }
+        const ids = Array.from(selectedIds);
         mergeRecords(ids);
         handleCancelSelection();
-    }, [selectedIds, records, runningRecord, mergeRecords, handleCancelSelection, t]);
+    }, [canMerge, selectedIds, mergeRecords, handleCancelSelection, t]);
 
     const handleBulkDelete = useCallback(() => {
         if (selectedIds.size === 0) return;
@@ -551,19 +592,6 @@ export default function RecordsScreen() {
         setShowActivityPicker(false);
         handleCancelSelection();
     }, [selectedIds, updateRecord, handleCancelSelection]);
-
-    // Can merge: 2+ selected, all same activity
-    const canMerge = useMemo(() => {
-        if (selectedIds.size < 2) return false;
-        const ids = Array.from(selectedIds);
-        const allAvailable = runningRecord
-            ? [...records, { id: runningRecord.id, recordTypeId: runningRecord.recordTypeId, startTime: runningRecord.startTime, endTime: '', duration: 0 }]
-            : records;
-        const selectedRecords = allAvailable.filter((r) => ids.includes(r.id));
-        if (selectedRecords.length < 2) return false;
-        const activities = new Set(selectedRecords.map((r) => r.recordTypeId));
-        return activities.size === 1;
-    }, [selectedIds, records, runningRecord]);
 
     // ── Filter Records ──
     const filteredRecords = useMemo(() => {

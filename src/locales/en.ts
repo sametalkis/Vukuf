@@ -216,6 +216,7 @@ export default {
   'records.deselectAll': 'Deselect All',
   'records.deleteSelectedConfirm': 'Are you sure you want to delete {{count}} records?',
   'records.mergeRequiresSameActivity': 'Records must belong to the same activity to merge',
+  'records.mergeRequiresConsecutive': 'Only consecutive records of the same activity can be merged',
   'records.longPressHint': 'Long press for multi-select',
 
   // Settings Screen

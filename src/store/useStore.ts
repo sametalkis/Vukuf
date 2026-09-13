@@ -259,6 +259,54 @@ export const useStore = create<TimeTrackerStore>()(
                     const totalCount = completedTargets.length + (isRunningIncluded ? 1 : 0);
                     if (totalCount < 2) return s;
 
+                    // Verify all have the same recordTypeId
+                    const activityType = isRunningIncluded && s.runningRecord
+                        ? s.runningRecord.recordTypeId
+                        : completedTargets[0]?.recordTypeId;
+                    if (!activityType) return s;
+
+                    const allSameType = completedTargets.every((r) => r.recordTypeId === activityType) &&
+                        (!isRunningIncluded || (s.runningRecord && s.runningRecord.recordTypeId === activityType));
+                    if (!allSameType) {
+                        console.warn("mergeRecords rejected: activities must be of the same type");
+                        return s;
+                    }
+
+                    // Check consecutive in all available records
+                    const allAvailable = isRunningIncluded && s.runningRecord
+                        ? [...s.records, { id: s.runningRecord.id, recordTypeId: s.runningRecord.recordTypeId, startTime: s.runningRecord.startTime, endTime: now(), duration: 0 }]
+                        : s.records;
+
+                    const sortedAll = [...allAvailable].sort(
+                        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+                    );
+                    const indices = recordIds
+                        .map((id) => sortedAll.findIndex((r) => r.id === id))
+                        .filter((idx) => idx !== -1)
+                        .sort((a, b) => a - b);
+
+                    if (indices.length < 2) return s;
+
+                    // Strictly contiguous (no other records between them)
+                    for (let i = 1; i < indices.length; i++) {
+                        if (indices[i] !== indices[i - 1] + 1) {
+                            console.warn("mergeRecords rejected: records are not consecutive");
+                            return s;
+                        }
+                    }
+
+                    // Time gap between adjacent records must not exceed 5 minutes
+                    for (let i = 1; i < indices.length; i++) {
+                        const prev = sortedAll[indices[i - 1]];
+                        const curr = sortedAll[indices[i]];
+                        const prevEnd = new Date(prev.endTime || now()).getTime();
+                        const currStart = new Date(curr.startTime).getTime();
+                        if (currStart - prevEnd > 5 * 60 * 1000) {
+                            console.warn("mergeRecords rejected: gap between records exceeds 5 minutes");
+                            return s;
+                        }
+                    }
+
                     // If running record is included in merge
                     if (isRunningIncluded && s.runningRecord) {
                         let earliest = s.runningRecord.startTime;

@@ -216,6 +216,7 @@ export default {
   'records.deselectAll': 'Seçimi Kaldır',
   'records.deleteSelectedConfirm': '{{count}} kaydı silmek istediğinizden emin misiniz?',
   'records.mergeRequiresSameActivity': 'Birleştirmek için kayıtlar aynı aktiviteye ait olmalı',
+  'records.mergeRequiresConsecutive': 'Yalnızca peş peşe (ardışık) aynı aktiviteler birleştirilebilir',
   'records.longPressHint': 'Çoklu seçim için uzun basın',
 
   // Settings Screen
