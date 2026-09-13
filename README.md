@@ -42,6 +42,24 @@ Uygulamayı tarayıcınız üzerinden doğrudan kullanmak veya mobil/masaüstü 
 
 <br>
 
+## 📸 Ekran Görüntüleri
+
+<div align="center">
+
+| Ana Ekran & Canlı Sayaç | İstatistikler & Donut Dağılımı | Zaman Tüneli & Günlük Akış |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/01_home_grid.png" alt="Ana Ekran & Canlı Sayaç" width="280"/> | <img src="docs/screenshots/02_statistics_donut.png" alt="İstatistikler & Donut Dağılımı" width="280"/> | <img src="docs/screenshots/03_records_timeline.png" alt="Zaman Tüneli & Günlük Akış" width="280"/> |
+
+<br>
+
+| Hassas Kayıt Düzenleme | Yıllık Ritim & Seri Analitiği |
+| :---: | :---: |
+| <img src="docs/screenshots/04_edit_record.png" alt="Hassas Kayıt Düzenleme" width="280"/> | <img src="docs/screenshots/05_activity_analytics.png" alt="Yıllık Ritim & Seri Analitiği" width="280"/> |
+
+</div>
+
+<br>
+
 ## 🕯️ Neden "Vukuf"?
 
 > *"Zaman, akıp giden bir nehirse; vukuf, o nehirde neyin sürüklendiğini görebilme şuurudur."*
