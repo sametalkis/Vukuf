@@ -183,7 +183,7 @@ export default function ActivityHeatmap({
                 const rt = recordTypes.find((t) => t.id === typeId);
                 activities.push({
                     id: typeId,
-                    name: rt ? rt.name : typeId === 'untracked' ? t('home.untracked') : t('common.activity'),
+                    name: rt ? rt.name : typeId === 'untracked' ? t('timer.untrackedTitle') : t('common.activity'),
                     color: rt ? rt.color : '#9ca3af',
                     duration: dur,
                 });

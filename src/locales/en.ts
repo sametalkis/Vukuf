@@ -39,6 +39,7 @@ export default {
   'timer.noActivities': 'No activities yet',
   'timer.noActivitiesDesc': 'Tap the + button below to create your first tracking category.',
   'timer.untrackedTitle': 'Untracked Time',
+  'home.untracked': 'Untracked Time',
   'timer.autoTracker': 'Automatic Background Tracker',
   'timer.waiting': 'Waiting for activity...',
   'timer.todayDuration': 'today {{duration}}',
@@ -173,6 +174,38 @@ export default {
   'editRecord.now': 'Now',
   'editRecord.running': 'Running',
   'editRecord.active': 'Active',
+
+  // Split Record
+  'editRecord.splitRecord': 'Split Record',
+  'editRecord.splitTitle': 'Split Record',
+  'editRecord.splitPoint': 'Split Point',
+  'editRecord.part1': 'Part 1',
+  'editRecord.part2': 'Part 2',
+  'editRecord.splitConfirm': 'Split',
+  'editRecord.splitCancel': 'Cancel',
+
+  // Absorb (Merge with neighbor)
+  'editRecord.absorbPrev': 'Merge with previous record',
+  'editRecord.absorbNext': 'Merge with next record',
+  'editRecord.absorbConfirm': 'This record will be deleted and its duration added to the neighbor. Continue?',
+
+  // Merge Banner
+  'records.mergeBanner': 'Merge these two records',
+  'records.mergeWithGap': 'Merge ({{duration}} gap record will be removed)',
+  'records.mergeWithGapConfirm': 'The intervening record of {{duration}} will be deleted. Continue?',
+  'records.merged': 'Records merged',
+
+  // Multi-select
+  'records.select': 'Select',
+  'records.selected': '{{count}} records selected',
+  'records.mergeSelected': 'Merge',
+  'records.deleteSelected': 'Delete',
+  'records.changeActivity': 'Change Activity',
+  'records.selectAll': 'Select All',
+  'records.deselectAll': 'Deselect All',
+  'records.deleteSelectedConfirm': 'Are you sure you want to delete {{count}} records?',
+  'records.mergeRequiresSameActivity': 'Records must belong to the same activity to merge',
+  'records.longPressHint': 'Long press for multi-select',
 
   // Settings Screen
   'settings.title': 'Settings',

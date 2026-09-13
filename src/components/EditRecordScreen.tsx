@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Trash2, Check, Clock, ChevronDown, X } from 'lucide-react';
+import { ChevronLeft, Trash2, Check, Clock, ChevronDown, X, Scissors, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { getContrastColor } from '../utils/colors';
 import { formatDuration } from '../utils/time';
 import DynamicIcon from './DynamicIcon';
+import SplitRecordModal from './SplitRecordModal';
 import type { Record } from '../types';
 
 interface EditRecordScreenProps {
@@ -28,15 +29,44 @@ function formatTime(iso: string) {
 
 export default function EditRecordScreen({ record, onClose }: EditRecordScreenProps) {
     const { t, i18n } = useTranslation();
-    const { recordTypes, updateRecord, deleteRecord } = useStore();
+    const { recordTypes, records, updateRecord, deleteRecord, mergeRecords } = useStore();
     const [activityId, setActivityId] = useState(record.recordTypeId);
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [start, setStart] = useState(new Date(record.startTime));
     const [end, setEnd] = useState(new Date(record.endTime));
+    const [showSplitModal, setShowSplitModal] = useState(false);
 
     const activity = recordTypes.find((a) => a.id === activityId) ||
-        (activityId === 'untracked' ? { id: 'untracked', name: t('home.untracked'), color: '#6b7280', icon: 'Clock' } : recordTypes[0]);
+        (activityId === 'untracked' ? { id: 'untracked', name: t('timer.untrackedTitle'), color: '#6b7280', icon: 'Clock' } : recordTypes[0]);
     const contrast = activity ? getContrastColor(activity.color) : '#fff';
+
+    // ── Find neighbor records for absorb feature ──
+    const neighbors = useMemo(() => {
+        if (record.id.startsWith('untracked-') || record.isRunning) return { prev: null, next: null };
+
+        const sorted = [...records]
+            .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+        const currentIdx = sorted.findIndex((r) => r.id === record.id);
+        if (currentIdx === -1) return { prev: null, next: null };
+
+        const prev = currentIdx > 0 ? sorted[currentIdx - 1] : null;
+        const next = currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : null;
+
+        // Only show absorb if neighbor is same activity and adjacent (gap < 60s)
+        const isAdjacentPrev = prev &&
+            prev.recordTypeId === record.recordTypeId &&
+            Math.abs(new Date(prev.endTime).getTime() - new Date(record.startTime).getTime()) < 60000;
+
+        const isAdjacentNext = next &&
+            next.recordTypeId === record.recordTypeId &&
+            Math.abs(new Date(record.endTime).getTime() - new Date(next.startTime).getTime()) < 60000;
+
+        return {
+            prev: isAdjacentPrev ? prev : null,
+            next: isAdjacentNext ? next : null,
+        };
+    }, [records, record.id, record.recordTypeId, record.startTime, record.endTime, record.isRunning]);
 
     // ── Button Handlers ──
     const adjustTime = (type: 'start' | 'end', minutes: number) => {
@@ -78,13 +108,31 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
         }
     };
 
+    const handleAbsorb = (direction: 'prev' | 'next') => {
+        const neighbor = direction === 'prev' ? neighbors.prev : neighbors.next;
+        if (!neighbor) return;
+
+        if (window.confirm(t('editRecord.absorbConfirm'))) {
+            const recId = (record as any).originalRecord?.id || record.id;
+            const neighborId = (neighbor as any).originalRecord?.id || neighbor.id;
+            mergeRecords([recId, neighborId]);
+            onClose();
+        }
+    };
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') {
+                if (showSplitModal) {
+                    setShowSplitModal(false);
+                } else {
+                    onClose();
+                }
+            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
+    }, [onClose, showSplitModal]);
 
     const content = (
         <motion.div
@@ -143,14 +191,48 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                 </div>
 
             <div className="flex flex-col flex-1 overflow-y-auto px-4 py-5 space-y-4">
-                {/* ── Delete Row (only for saved records) ── */}
-                {!record.id.startsWith('untracked-') && (
-                    <button
-                        onClick={handleDelete}
-                        className="w-full flex items-center justify-center gap-2 bg-[#171717] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
-                    >
-                        <Trash2 size={16} /> {t('editRecord.deleteRecord')}
-                    </button>
+                {/* ── Action Buttons Row (Delete + Split) ── */}
+                <div className="flex gap-2">
+                    {/* Delete */}
+                    {!record.id.startsWith('untracked-') && (
+                        <button
+                            onClick={handleDelete}
+                            className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
+                        >
+                            <Trash2 size={16} /> {t('editRecord.deleteRecord')}
+                        </button>
+                    )}
+                    {/* Split */}
+                    {!record.isRunning && !record.id.startsWith('untracked-') && (
+                        <button
+                            onClick={() => setShowSplitModal(true)}
+                            className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-amber-500/20 hover:text-amber-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
+                        >
+                            <Scissors size={16} /> {t('editRecord.splitRecord')}
+                        </button>
+                    )}
+                </div>
+
+                {/* ── Absorb Neighbors ── */}
+                {(neighbors.prev || neighbors.next) && (
+                    <div className="flex gap-2">
+                        {neighbors.prev && (
+                            <button
+                                onClick={() => handleAbsorb('prev')}
+                                className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-emerald-500/20 hover:text-emerald-400 py-3 rounded-xl text-xs font-semibold text-gray-400 transition-colors"
+                            >
+                                <ArrowLeftToLine size={14} /> {t('editRecord.absorbPrev')}
+                            </button>
+                        )}
+                        {neighbors.next && (
+                            <button
+                                onClick={() => handleAbsorb('next')}
+                                className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-emerald-500/20 hover:text-emerald-400 py-3 rounded-xl text-xs font-semibold text-gray-400 transition-colors"
+                            >
+                                {t('editRecord.absorbNext')} <ArrowRightToLine size={14} />
+                            </button>
+                        )}
+                    </div>
                 )}
 
                 {/* ── Start Time Box ── */}
@@ -298,7 +380,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                                             <div className="flex-1 flex flex-col items-center justify-center gap-1.5 w-full">
                                                 <Clock size={22} className="text-neutral-400" />
                                                 <span className="text-[11px] font-semibold text-center leading-tight px-1 w-full truncate text-neutral-400">
-                                                    {t('home.untracked')}
+                                                    {t('timer.untrackedTitle')}
                                                 </span>
                                             </div>
                                             {activityId === 'untracked' && (
@@ -329,5 +411,18 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
     );
 
     if (typeof document === 'undefined') return null;
-    return createPortal(content, document.body);
+    return (
+        <>
+            {createPortal(content, document.body)}
+            <AnimatePresence>
+                {showSplitModal && (
+                    <SplitRecordModal
+                        record={record}
+                        onClose={() => setShowSplitModal(false)}
+                        onSplit={onClose}
+                    />
+                )}
+            </AnimatePresence>
+        </>
+    );
 }

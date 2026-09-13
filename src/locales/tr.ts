@@ -39,6 +39,7 @@ export default {
   'timer.noActivities': 'Henüz aktivite yok',
   'timer.noActivitiesDesc': 'İlk takip kategorinizi oluşturmak için aşağıdaki + butonuna dokunun.',
   'timer.untrackedTitle': 'Takip Edilmeyen Zaman',
+  'home.untracked': 'Takip Edilmeyen Zaman',
   'timer.autoTracker': 'Otomatik Arka Plan Takibi',
   'timer.waiting': 'Aktivite bekleniyor...',
   'timer.todayDuration': 'bugün {{duration}}',
@@ -173,6 +174,38 @@ export default {
   'editRecord.now': 'Şimdi',
   'editRecord.running': 'Çalışıyor',
   'editRecord.active': 'Aktif',
+
+  // Split Record
+  'editRecord.splitRecord': 'Kaydı Böl',
+  'editRecord.splitTitle': 'Kaydı Böl',
+  'editRecord.splitPoint': 'Bölme Noktası',
+  'editRecord.part1': 'Parça 1',
+  'editRecord.part2': 'Parça 2',
+  'editRecord.splitConfirm': 'Böl',
+  'editRecord.splitCancel': 'Vazgeç',
+
+  // Absorb (Merge with neighbor)
+  'editRecord.absorbPrev': 'Önceki kayda birleştir',
+  'editRecord.absorbNext': 'Sonraki kayda birleştir',
+  'editRecord.absorbConfirm': 'Bu kayıt silinecek ve süresi komşu kayda eklenecek. Devam edilsin mi?',
+
+  // Merge Banner
+  'records.mergeBanner': 'Bu iki kaydı birleştir',
+  'records.mergeWithGap': 'Birleştir (aradaki {{duration}} kayıt silinecek)',
+  'records.mergeWithGapConfirm': 'İki kayıt arasındaki {{duration}} süreli diğer kayıt silinecektir. Devam edilsin mi?',
+  'records.merged': 'Kayıtlar birleştirildi',
+
+  // Multi-select
+  'records.select': 'Seç',
+  'records.selected': '{{count}} kayıt seçili',
+  'records.mergeSelected': 'Birleştir',
+  'records.deleteSelected': 'Sil',
+  'records.changeActivity': 'Aktivite Değiştir',
+  'records.selectAll': 'Tümünü Seç',
+  'records.deselectAll': 'Seçimi Kaldır',
+  'records.deleteSelectedConfirm': '{{count}} kaydı silmek istediğinizden emin misiniz?',
+  'records.mergeRequiresSameActivity': 'Birleştirmek için kayıtlar aynı aktiviteye ait olmalı',
+  'records.longPressHint': 'Çoklu seçim için uzun basın',
 
   // Settings Screen
   'settings.title': 'Ayarlar',

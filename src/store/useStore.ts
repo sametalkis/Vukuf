@@ -43,6 +43,9 @@ interface TimeTrackerStore {
     // Record actions
     updateRecord: (id: string, data: Partial<Omit<Record, 'id'>>) => void;
     deleteRecord: (id: string) => void;
+    addRecord: (data: Omit<Record, 'id' | 'duration'>) => void;
+    mergeRecords: (recordIds: string[], gapIdsToRemove?: string[]) => void;
+    splitRecord: (recordId: string, splitTime: string) => void;
 
     // Data management
     importData: (json: string) => void;
@@ -202,6 +205,111 @@ export const useStore = create<TimeTrackerStore>()(
                         return { runningRecord: null };
                     }
                     return { records: s.records.filter((r) => r.id !== id) };
+                });
+            },
+
+            addRecord: (data) => {
+                const newRecord: Record = {
+                    id: uuidv4(),
+                    recordTypeId: data.recordTypeId,
+                    startTime: data.startTime,
+                    endTime: data.endTime,
+                    duration: durationSeconds(data.startTime, data.endTime),
+                };
+                set((s) => ({ records: [...s.records, newRecord] }));
+            },
+
+            mergeRecords: (recordIds, gapIdsToRemove = []) => {
+                set((s) => {
+                    const allIdsToRemove = new Set(gapIdsToRemove);
+                    const isRunningIncluded = !!(s.runningRecord && recordIds.includes(s.runningRecord.id));
+                    const completedTargets = s.records.filter((r) => recordIds.includes(r.id));
+
+                    const totalCount = completedTargets.length + (isRunningIncluded ? 1 : 0);
+                    if (totalCount < 2) return s;
+
+                    // If running record is included in merge
+                    if (isRunningIncluded && s.runningRecord) {
+                        let earliest = s.runningRecord.startTime;
+                        for (const r of completedTargets) {
+                            if (new Date(r.startTime).getTime() < new Date(earliest).getTime()) {
+                                earliest = r.startTime;
+                            }
+                            allIdsToRemove.add(r.id);
+                        }
+
+                        return {
+                            runningRecord: {
+                                ...s.runningRecord,
+                                startTime: earliest,
+                            },
+                            records: s.records.filter((r) => !allIdsToRemove.has(r.id)),
+                        };
+                    }
+
+                    // Completed records only
+                    const targets = completedTargets.sort(
+                        (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+                    );
+                    if (targets.length < 2) return s;
+
+                    const earliest = targets[0].startTime;
+                    const latest = targets.reduce(
+                        (max, r) => (new Date(r.endTime).getTime() > new Date(max).getTime() ? r.endTime : max),
+                        targets[0].endTime
+                    );
+
+                    const mergedRecord: Record = {
+                        id: targets[0].id,
+                        recordTypeId: targets[0].recordTypeId,
+                        startTime: earliest,
+                        endTime: latest,
+                        duration: durationSeconds(earliest, latest),
+                    };
+
+                    for (let i = 1; i < targets.length; i++) {
+                        allIdsToRemove.add(targets[i].id);
+                    }
+
+                    return {
+                        records: s.records
+                            .filter((r) => !allIdsToRemove.has(r.id))
+                            .map((r) => (r.id === targets[0].id ? mergedRecord : r)),
+                    };
+                });
+            },
+
+            splitRecord: (recordId, splitTime) => {
+                set((s) => {
+                    const record = s.records.find((r) => r.id === recordId);
+                    if (!record) return s;
+
+                    const splitMs = new Date(splitTime).getTime();
+                    const startMs = new Date(record.startTime).getTime();
+                    const endMs = new Date(record.endTime).getTime();
+
+                    // splitTime must be strictly between start and end
+                    if (splitMs <= startMs || splitMs >= endMs) return s;
+
+                    const updatedFirst: Record = {
+                        ...record,
+                        endTime: splitTime,
+                        duration: durationSeconds(record.startTime, splitTime),
+                    };
+
+                    const newSecond: Record = {
+                        id: uuidv4(),
+                        recordTypeId: record.recordTypeId,
+                        startTime: splitTime,
+                        endTime: record.endTime,
+                        duration: durationSeconds(splitTime, record.endTime),
+                    };
+
+                    return {
+                        records: s.records.flatMap((r) =>
+                            r.id === recordId ? [updatedFirst, newSecond] : [r]
+                        ),
+                    };
                 });
             },
 
