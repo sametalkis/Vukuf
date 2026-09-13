@@ -118,12 +118,14 @@ export default {
   'activityDetail.noRecordsPeriod': 'Bu dönemde kayıt yok',
   'activityDetail.noSessionsFound': 'Bu dönem için bireysel seans kaydı bulunamadı.',
 
-  // Statistics Export Modal
+  // Statistics & Records Export Modal
   'export.title': 'İstatistik Sayfası Görüntüsü',
+  'export.recordsTitle': 'Kayıtlar Sayfası Görüntüsü',
   'export.summary': '{{period}} • {{badge}} Özet',
   'export.preparing': 'Görsel hazırlanıyor...',
   'export.preparingTitle': 'Sayfa Görüntüsü Hazırlanıyor...',
   'export.preparingDesc': 'İstatistik dairesi ve aktiviteler render ediliyor',
+  'export.preparingRecordsDesc': 'Kayıtlar ve aktiviteler render ediliyor',
   'export.mobileHint': '💡 İpucu: Mobilde görselin üzerine basılı tutarak doğrudan galerinize kaydedebilirsiniz.',
   'export.timeout': 'Görsel oluşturma zaman aşımına uğradı.',
   'export.downloadImage': 'Görseli İndir (PNG)',
@@ -135,10 +137,12 @@ export default {
   'export.retryHint': '{{error}} Tekrar deneyebilir veya pencereyi kapatıp yeniden açabilirsiniz.',
   'export.notReady': 'Önizleme hazır değil.',
   'export.close': 'Dışa aktarma penceresini kapat',
-  'export.disconnected': 'İstatistik görünümü artık ekranda değil.',
+  'export.disconnected': 'Görünüm artık ekranda değil.',
   'export.unmeasurable': 'Dışa aktarma görünümü ölçülemedi.',
   'export.blobError': 'Tarayıcı PNG verisi oluşturamadı.',
   'export.shareText': '{{period}} zaman takibi istatistikleri: Toplam {{total}}',
+  'export.recordsShareText': '{{period}} zaman takibi kayıtları: Toplam {{total}}',
+  'time.today': 'Bugün',
 
   // Add / Edit Activity Modal
   'addActivity.titleNew': 'Yeni Aktivite',

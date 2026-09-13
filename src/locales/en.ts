@@ -118,12 +118,14 @@ export default {
   'activityDetail.noRecordsPeriod': 'No records in this period',
   'activityDetail.noSessionsFound': 'No individual sessions found for this period.',
 
-  // Statistics Export Modal
+  // Statistics & Records Export Modal
   'export.title': 'Statistics Page Image',
+  'export.recordsTitle': 'Records Page Image',
   'export.summary': '{{period}} • {{badge}} Summary',
   'export.preparing': 'Preparing image...',
   'export.preparingTitle': 'Preparing Page Image...',
   'export.preparingDesc': 'Rendering chart and activities',
+  'export.preparingRecordsDesc': 'Rendering records and activities',
   'export.mobileHint': '💡 Tip: On mobile, press and hold the image to save directly to your photos.',
   'export.timeout': 'Image generation timed out.',
   'export.downloadImage': 'Download Image (PNG)',
@@ -135,10 +137,12 @@ export default {
   'export.retryHint': '{{error}} You can retry or close and reopen the modal.',
   'export.notReady': 'Preview is not ready.',
   'export.close': 'Close export modal',
-  'export.disconnected': 'Statistics view is no longer on screen.',
+  'export.disconnected': 'View is no longer on screen.',
   'export.unmeasurable': 'Export view could not be measured.',
   'export.blobError': 'Browser could not create PNG data.',
   'export.shareText': '{{period}} time tracking statistics: Total {{total}}',
+  'export.recordsShareText': '{{period}} time tracking records: Total {{total}}',
+  'time.today': 'Today',
 
   // Add / Edit Activity Modal
   'addActivity.titleNew': 'New Activity',

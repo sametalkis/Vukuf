@@ -1,12 +1,13 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Clock, CheckSquare, Square, X, Trash2, Link2, Palette } from 'lucide-react';
+import { Clock, CheckSquare, Square, X, Trash2, Link2, Palette, Share2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { formatDuration, splitRecordByDays } from '../utils/time';
 import DateSelectorBar from '../components/DateSelectorBar';
 import type { ViewMode } from '../components/DateSelectorBar';
 import EditRecordScreen from '../components/EditRecordScreen';
+import StatisticsExportModal from '../components/StatisticsExportModal';
 import TrackingCard from '../components/TrackingCard';
 import DynamicIcon from '../components/DynamicIcon';
 import { getContrastColor } from '../utils/colors';
@@ -217,7 +218,7 @@ function RecordRow({
         return (
             <div className="relative flex items-center gap-2">
                 {isSelectionMode && (
-                    <div className="flex-shrink-0 opacity-30">
+                    <div data-export-exclude className="flex-shrink-0 opacity-30">
                         <Square size={20} className="text-gray-600" />
                     </div>
                 )}
@@ -253,6 +254,7 @@ function RecordRow({
         >
             {isSelectionMode && (
                 <button
+                    data-export-exclude
                     onClick={onToggleSelect}
                     className="flex-shrink-0 transition-transform active:scale-90"
                 >
@@ -437,6 +439,17 @@ export default function RecordsScreen() {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [showActivityPicker, setShowActivityPicker] = useState(false);
 
+    // Export / Share state
+    const exportAreaRef = useRef<HTMLDivElement>(null);
+    const [exportSnapshot, setExportSnapshot] = useState<{
+        viewMode: ViewMode;
+        selectedDate: Date;
+        totalDuration: number;
+        sourceElement: HTMLElement;
+    } | null>(null);
+
+    const isTr = i18n.language?.startsWith('tr');
+
     // Live tick for midnight-crossing running records
     const [tick, setTick] = useState(0);
     useEffect(() => {
@@ -587,6 +600,40 @@ export default function RecordsScreen() {
         return groupByDay(visibleRecords, showUntracked, { mode: viewMode, date: selectedDate }, t, locale);
     }, [visibleRecords, showUntracked, viewMode, selectedDate, tick, t, locale]);
 
+    const totalDuration = useMemo(() => {
+        return filteredRecords
+            .filter((r) => r.recordTypeId !== 'untracked')
+            .reduce((sum, r) => sum + r.duration, 0);
+    }, [filteredRecords]);
+
+    const periodTitle = useMemo(() => {
+        if (viewMode === 'day') {
+            const today = new Date();
+            if (selectedDate.toDateString() === today.toDateString()) return t('common.today');
+            return selectedDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        if (viewMode === 'month') {
+            return selectedDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+        }
+        if (viewMode === 'year') {
+            return isTr ? `${selectedDate.getFullYear()} Yılı` : `${selectedDate.getFullYear()}`;
+        }
+        return t('dateSelector.allHistory');
+    }, [viewMode, selectedDate, locale, isTr, t]);
+
+    const periodSubtitle = useMemo(() => {
+        if (viewMode === 'day') {
+            return selectedDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
+        }
+        if (viewMode === 'month') {
+            return selectedDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+        }
+        if (viewMode === 'year') {
+            return `${selectedDate.getFullYear()}`;
+        }
+        return t('common.allTime');
+    }, [viewMode, selectedDate, locale, t]);
+
     return (
         <div className="flex flex-col min-h-screen pt-4 pb-[168px]">
             {/* Content */}
@@ -601,29 +648,60 @@ export default function RecordsScreen() {
                     </div>
                 </div>
             ) : (
-                <div className="px-4 space-y-4">
-                    {/* Header bar with Selection toggle */}
-                    <div className="flex items-center justify-between px-1">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                            {t('nav.records')}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (isSelectionMode) {
-                                    handleCancelSelection();
-                                } else {
-                                    setIsSelectionMode(true);
-                                }
-                            }}
-                            className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                                isSelectionMode
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm'
-                                    : 'text-gray-400 hover:text-gray-200 bg-[#141414] border border-[#262626] hover:border-[#383838]'
-                            }`}
-                        >
-                            {isSelectionMode ? t('common.cancel') : t('records.select')}
-                        </button>
+                <div ref={exportAreaRef} className="px-4 space-y-4">
+                    {/* Header bar with Selection toggle and Share */}
+                    <div className="flex items-center justify-between pt-1 pb-1 mb-1 px-1">
+                        <div>
+                            <h1 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
+                                {t('nav.records')}
+                            </h1>
+                            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 mt-0.5">
+                                {periodSubtitle} • {formatDuration(totalDuration)}
+                            </p>
+                        </div>
+
+                        <div data-export-exclude className="flex items-center gap-2">
+                            {/* Share screenshot button */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!exportAreaRef.current) return;
+                                    if (isSelectionMode) handleCancelSelection();
+                                    setExportSnapshot({
+                                        viewMode,
+                                        selectedDate: new Date(selectedDate),
+                                        totalDuration,
+                                        sourceElement: exportAreaRef.current,
+                                    });
+                                }}
+                                className="w-10 h-10 rounded-2xl bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-200 border border-gray-200/80 dark:border-neutral-800 shadow-xs flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                                title={t('common.share')}
+                                aria-label={t('common.share')}
+                            >
+                                <Share2 size={18} style={{ color: 'var(--primary, #ff9100)' }} />
+                            </button>
+
+                            {/* Select button (Icon only) */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (isSelectionMode) {
+                                        handleCancelSelection();
+                                    } else {
+                                        setIsSelectionMode(true);
+                                    }
+                                }}
+                                className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all active:scale-95 cursor-pointer border ${
+                                    isSelectionMode
+                                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-xs'
+                                        : 'bg-white dark:bg-neutral-900 hover:bg-gray-50 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-200 border-gray-200/80 dark:border-neutral-800 shadow-xs'
+                                }`}
+                                title={isSelectionMode ? t('common.cancel') : t('records.select')}
+                                aria-label={isSelectionMode ? t('common.cancel') : t('records.select')}
+                            >
+                                {isSelectionMode ? <X size={18} /> : <CheckSquare size={18} />}
+                            </button>
+                        </div>
                     </div>
 
                     {groups.map((group) => (
@@ -660,8 +738,9 @@ export default function RecordsScreen() {
                     {/* Load More Button */}
                     {hasMore && (
                         <button
+                            data-export-exclude
                             onClick={() => setLimit(l => l + 50)}
-                            className="w-full py-4 mt-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl font-bold text-sm transition-colors"
+                            className="w-full py-4 mt-4 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl font-bold text-sm transition-colors cursor-pointer"
                         >
                             {t('common.loadMore')}
                         </button>
@@ -712,6 +791,24 @@ export default function RecordsScreen() {
                     />
                 )}
             </AnimatePresence>
+
+            {/* Records Single-Page Image Export Modal */}
+            {exportSnapshot && (
+                <StatisticsExportModal
+                    isOpen
+                    onClose={() => setExportSnapshot(null)}
+                    viewMode={exportSnapshot.viewMode}
+                    selectedDate={exportSnapshot.selectedDate}
+                    totalDuration={exportSnapshot.totalDuration}
+                    sourceElement={exportSnapshot.sourceElement}
+                    customTitle={t('export.recordsTitle')}
+                    customSubtitle={t('export.recordsShareText', {
+                        period: periodTitle,
+                        total: formatDuration(exportSnapshot.totalDuration),
+                    })}
+                    filePrefix={isTr ? 'kayitlar' : 'records'}
+                />
+            )}
         </div>
     );
 }

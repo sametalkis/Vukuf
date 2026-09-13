@@ -14,6 +14,9 @@ interface StatisticsExportModalProps {
     selectedDate: Date;
     totalDuration: number;
     sourceElement: HTMLElement;
+    customTitle?: string;
+    customSubtitle?: string;
+    filePrefix?: string;
 }
 
 const MAX_CANVAS_EDGE = 8192;
@@ -79,6 +82,9 @@ export default function StatisticsExportModal({
     selectedDate,
     totalDuration,
     sourceElement,
+    customTitle,
+    customSubtitle,
+    filePrefix,
 }: StatisticsExportModalProps) {
     const { t, i18n } = useTranslation();
     const locale = i18n.language?.startsWith('tr') ? 'tr-TR' : 'en-US';
@@ -98,7 +104,7 @@ export default function StatisticsExportModal({
     const periodTitle = useMemo(() => {
         if (viewMode === 'day') {
             const today = new Date();
-            if (selectedDate.toDateString() === today.toDateString()) return t('time.today');
+            if (selectedDate.toDateString() === today.toDateString()) return t('common.today');
             return selectedDate.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
         }
         if (viewMode === 'month') {
@@ -123,7 +129,7 @@ export default function StatisticsExportModal({
         // Freeze the real page before any async work. Only this detached copy
         // receives export spacing and text wrapping; the live timer keeps running.
         const node = sourceElement.cloneNode(true) as HTMLElement;
-        const backgroundColor = getEffectiveBackgroundColor(sourceElement, isDark ? '#030712' : '#f3f4f6');
+        const backgroundColor = getEffectiveBackgroundColor(sourceElement, isDark ? '#0a0a0a' : '#f3f4f6');
         const sourceStyle = getComputedStyle(sourceElement);
         const width = Math.ceil(sourceElement.getBoundingClientRect().width);
         if (width <= 0) throw new Error(t('export.unmeasurable'));
@@ -246,7 +252,8 @@ export default function StatisticsExportModal({
     const handleDownload = () => {
         if (!imageUrl) return;
         const link = document.createElement('a');
-        const fileNameSafe = createFileSlug(periodTitle) || (isTr ? 'istatistik' : 'statistics');
+        const defaultPrefix = filePrefix || (isTr ? 'istatistik' : 'statistics');
+        const fileNameSafe = createFileSlug(periodTitle) || defaultPrefix;
         link.download = `vukuf-${fileNameSafe}-${new Date().toISOString().slice(0, 10)}.png`;
         link.href = imageUrl;
         document.body.appendChild(link);
@@ -258,14 +265,15 @@ export default function StatisticsExportModal({
     const handleShare = async () => {
         if (!imageBlob) return;
         try {
-            const file = new File([imageBlob], `${createFileSlug(periodTitle) || (isTr ? 'istatistik' : 'statistics')}.png`, {
+            const defaultPrefix = filePrefix || (isTr ? 'istatistik' : 'statistics');
+            const file = new File([imageBlob], `${createFileSlug(periodTitle) || defaultPrefix}.png`, {
                 type: 'image/png',
             });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     title: `Vukuf - ${periodTitle}`,
-                    text: t('export.shareText', { period: periodTitle, total: formatDuration(totalDuration) }),
+                    text: customSubtitle || t('export.shareText', { period: periodTitle, total: formatDuration(totalDuration) }),
                     files: [file],
                 });
             } else {
@@ -330,7 +338,7 @@ export default function StatisticsExportModal({
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                                    {t('export.title')}
+                                    {customTitle || t('export.title')}
                                 </h3>
                                 <p className="text-[11px] text-gray-400 dark:text-gray-500">
                                     {t('export.summary', { period: periodTitle, badge: periodBadge })}
@@ -342,7 +350,7 @@ export default function StatisticsExportModal({
                             type="button"
                             onClick={onClose}
                             aria-label={t('export.close')}
-                            className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors"
+                            className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                         >
                             <X size={18} />
                         </button>
@@ -358,7 +366,7 @@ export default function StatisticsExportModal({
                                         {t('export.preparingTitle')}
                                     </p>
                                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                        {t('export.preparingDesc')}
+                                        {customSubtitle || t('export.preparingDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -442,3 +450,6 @@ export default function StatisticsExportModal({
         document.body
     );
 }
+
+export { StatisticsExportModal as ExportModal };
+
