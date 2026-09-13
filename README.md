@@ -3,7 +3,7 @@
     <h1>
         <b>Vukuf</b>
     </h1>
-    PWA uyumlu, sıfır-bilgi E2EE senkronizasyonlu, MCP destekli, modern ve minimalist zaman takip uygulaması.
+    PWA uyumlu, Zero-Knowledge E2EE senkronizasyonlu, MCP destekli, modern ve minimalist zaman takip uygulaması.
     <br>
     Tüm veriler tamamen cihazınızda şifreli saklanır; gizlilik ve farkındalık odaklıdır.
 </div>
