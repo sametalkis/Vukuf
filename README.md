@@ -42,6 +42,18 @@ Uygulamayı tarayıcınız üzerinden doğrudan kullanmak veya mobil/masaüstü 
 
 <br>
 
+## 🕯️ Neden "Vukuf"?
+
+> *"Zaman, akıp giden bir nehirse; vukuf, o nehirde neyin sürüklendiğini görebilme şuurudur."*
+
+**Vukuf**, kökleri asırlık bir zaman felsefesine uzanan kadim bir kavramdır: Bir şeyin mahiyetini bilmek, derinlemesine kavramak ve ona **vakıf olmak** anlamına gelir.
+
+Geleneksel düşüncede yer alan **"Vukûf-i Zamânî"** ilkesi; insanın her anının, geçen her dakikasının ve nefesinin idrakinde olmasını, vaktini gafletle değil farkındalıkla yaşamasını öğütler.
+
+Zamanınızı başkalarına raporlamak için değil; kendi zamanınıza **vakıf olmak** için takip edin.
+
+<br>
+
 ## Genel Bakış
 
 **Vukuf**, günlük aktivitelerinizi ve zaman akışınızı derin bir farkındalıkla kaydetmeniz için tasarlanmış modern, minimalist ve gizlilik odaklı (local-first) bir zaman takip uygulamasıdır. 
