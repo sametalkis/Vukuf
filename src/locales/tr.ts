@@ -178,6 +178,13 @@ export default {
   'editRecord.now': 'Şimdi',
   'editRecord.running': 'Çalışıyor',
   'editRecord.active': 'Aktif',
+  'editRecord.stopTimer': 'Sayacı Durdur',
+  'editRecord.finishSession': 'Bitiş Saati Ayarla',
+  'editRecord.keepRunning': 'Hâlâ Devam Ediyor',
+  'editRecord.saveAndFinish': 'Bitir ve Kaydet',
+  'editRecord.currentlyRunning': 'Aktivite devam ediyor',
+  'editRecord.sessionEnded': 'Aktivite sona erdi',
+  'editRecord.stopTimerHint': 'Kategori veya başlangıcı düzenleyebilir, durdurabilir veya bitiş saati belirleyebilirsiniz.',
 
   // Split Record
   'editRecord.splitRecord': 'Kaydı Böl',

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Trash2, Check, Clock, ChevronDown, X, Scissors, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
+import { ChevronLeft, Trash2, Check, Clock, ChevronDown, X, Scissors, ArrowLeftToLine, ArrowRightToLine, Square } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { getContrastColor } from '../utils/colors';
@@ -34,7 +34,21 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
     const [isActivityOpen, setIsActivityOpen] = useState(false);
     const [start, setStart] = useState(new Date(record.startTime));
     const [end, setEnd] = useState(new Date(record.endTime));
+    const [isStillRunning, setIsStillRunning] = useState(!!record.isRunning);
     const [showSplitModal, setShowSplitModal] = useState(false);
+
+    const [liveDuration, setLiveDuration] = useState(() =>
+        Math.max(0, Math.floor((Date.now() - new Date(record.startTime).getTime()) / 1000))
+    );
+
+    useEffect(() => {
+        if (!record.isRunning || !isStillRunning) return;
+        setLiveDuration(Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000)));
+        const interval = setInterval(() => {
+            setLiveDuration(Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000)));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [record.isRunning, isStillRunning, start]);
 
     const activity = recordTypes.find((a) => a.id === activityId) ||
         (activityId === 'untracked' ? { id: 'untracked', name: t('timer.untrackedTitle'), color: '#6b7280', icon: 'Clock' } : recordTypes[0]);
@@ -74,7 +88,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
         if (type === 'start') {
             const newStart = new Date(start.getTime() + minutes * 60000);
             if (newStart > now) { setStart(now); return; }
-            if (newStart < end) setStart(newStart);
+            if (isStillRunning || newStart < end) setStart(newStart);
         } else {
             const newEnd = new Date(end.getTime() + minutes * 60000);
             if (newEnd > now) { setEnd(now); return; }
@@ -84,21 +98,34 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
 
     const setNow = (type: 'start' | 'end') => {
         const n = new Date();
-        if (type === 'start' && (record.isRunning || n < end)) setStart(n);
-        if (type === 'end' && !record.isRunning && n > start) setEnd(n);
+        if (type === 'start') {
+            if (isStillRunning || n < end) setStart(n);
+        } else {
+            if (n > start) setEnd(n);
+        }
     };
 
     const handleSave = () => {
         updateRecord(record.id, {
             recordTypeId: activityId,
             startTime: start.toISOString(),
-            ...(record.isRunning ? {} : { endTime: end.toISOString() }),
+            ...(record.isRunning && isStillRunning ? {} : { endTime: end.toISOString() }),
+        });
+        onClose();
+    };
+
+    const handleStop = () => {
+        const stopNow = new Date().toISOString();
+        updateRecord(record.id, {
+            recordTypeId: activityId,
+            startTime: start.toISOString(),
+            endTime: stopNow,
         });
         onClose();
     };
 
     const handleDelete = () => {
-        if (record.id.startsWith('untracked-')) {
+        if (record.id.startsWith('untracked-') && !record.isRunning) {
             onClose();
             return;
         }
@@ -172,13 +199,13 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                         <div>
                             <h2 className="text-base font-bold leading-tight">{activity.name}</h2>
                             <div className="text-xs font-medium opacity-90 tracking-wide mt-0.5" style={{ color: contrast }}>
-                                {formatTime(start.toISOString())} – {record.isRunning ? t('editRecord.running') : formatTime(end.toISOString())}
+                                {formatTime(start.toISOString())} – {isStillRunning ? t('editRecord.running') : formatTime(end.toISOString())}
                             </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="text-base font-bold tracking-tight">
-                            {record.isRunning ? t('editRecord.active') : formatDuration(Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000)), i18n.language)}
+                            {isStillRunning ? formatDuration(liveDuration, i18n.language) : formatDuration(Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000)), i18n.language)}
                         </div>
                         <button
                             onClick={onClose}
@@ -191,22 +218,31 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                 </div>
 
             <div className="flex flex-col flex-1 overflow-y-auto px-4 py-5 space-y-4">
-                {/* ── Action Buttons Row (Delete + Split) ── */}
+                {/* ── Action Buttons Row (Delete + Stop / Split) ── */}
                 <div className="flex gap-2">
                     {/* Delete */}
-                    {!record.id.startsWith('untracked-') && (
+                    {(!record.id.startsWith('untracked-') || record.isRunning) && (
                         <button
                             onClick={handleDelete}
-                            className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
+                            className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-red-500/20 hover:text-red-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors cursor-pointer"
                         >
                             <Trash2 size={16} /> {t('editRecord.deleteRecord')}
+                        </button>
+                    )}
+                    {/* Stop Timer */}
+                    {record.isRunning && isStillRunning && (
+                        <button
+                            onClick={handleStop}
+                            className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-rose-500/20 hover:text-rose-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors cursor-pointer"
+                        >
+                            <Square size={16} className="fill-current" /> {t('editRecord.stopTimer')}
                         </button>
                     )}
                     {/* Split */}
                     {!record.isRunning && !record.id.startsWith('untracked-') && (
                         <button
                             onClick={() => setShowSplitModal(true)}
-                            className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-amber-500/20 hover:text-amber-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors"
+                            className="flex-1 flex items-center justify-center gap-2 bg-[#171717] hover:bg-amber-500/20 hover:text-amber-400 py-3.5 rounded-xl text-sm font-semibold text-gray-300 transition-colors cursor-pointer"
                         >
                             <Scissors size={16} /> {t('editRecord.splitRecord')}
                         </button>
@@ -264,31 +300,78 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                 </div>
 
                 {/* ── End Time Box ── */}
-                <div className={`relative border border-[#2a2a2a] rounded-xl pt-5 pb-3 px-3 text-center mt-2 ${record.isRunning ? 'opacity-30 pointer-events-none' : ''}`}>
+                <div className="relative border border-[#2a2a2a] rounded-xl pt-4 pb-3 px-3 text-center mt-2 bg-[#121212]">
                     <span className="absolute -top-2.5 left-4 bg-[#0a0a0a] px-1 text-[11px] font-medium text-gray-500 uppercase tracking-wider">{t('editRecord.endLabel')}</span>
 
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                        <span className="text-rose-500 font-bold text-sm tracking-wide">{record.isRunning ? t('editRecord.now') : formatDate(end.toISOString(), i18n.language)}</span>
-                        <span className="text-white font-black text-3xl tracking-tight leading-none">{record.isRunning ? t('editRecord.running') : formatTime(end.toISOString())}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
-                        {[-30, -5, -1, 1, 5, 30].map(v => (
+                    {record.isRunning && (
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <span className="text-xs font-medium text-gray-400">
+                                {isStillRunning ? t('editRecord.currentlyRunning') : t('editRecord.sessionEnded')}
+                            </span>
                             <button
-                                key={v}
-                                onClick={() => adjustTime('end', v)}
-                                className="flex-1 min-w-[36px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-400 active:bg-[#333]"
+                                type="button"
+                                onClick={() => {
+                                    if (isStillRunning) {
+                                        setIsStillRunning(false);
+                                        setEnd(new Date());
+                                    } else {
+                                        setIsStillRunning(true);
+                                    }
+                                }}
+                                className={`text-xs px-2.5 py-1 rounded-full font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                                    isStillRunning
+                                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25'
+                                        : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25'
+                                }`}
                             >
-                                {v > 0 ? '+' : ''}{v}
+                                {isStillRunning ? t('editRecord.finishSession') : t('editRecord.keepRunning')}
                             </button>
-                        ))}
-                        <button
-                            onClick={() => setNow('end')}
-                            className="flex-1 min-w-[48px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-300 active:bg-[#333]"
-                        >
-                            {t('editRecord.now')}
-                        </button>
-                    </div>
+                        </div>
+                    )}
+
+                    {isStillRunning ? (
+                        <div className="py-2 flex flex-col items-center justify-center gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                </span>
+                                <span className="text-white font-black text-2xl tracking-tight leading-none">
+                                    {t('editRecord.running')}
+                                </span>
+                            </div>
+                            <p className="text-xs text-neutral-400">
+                                {t('editRecord.stopTimerHint')}
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex items-center justify-center gap-2 mb-3">
+                                <span className="text-rose-500 font-bold text-sm tracking-wide">{formatDate(end.toISOString(), i18n.language)}</span>
+                                <span className="text-white font-black text-3xl tracking-tight leading-none">{formatTime(end.toISOString())}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
+                                {[-30, -5, -1, 1, 5, 30].map(v => (
+                                    <button
+                                        key={v}
+                                        type="button"
+                                        onClick={() => adjustTime('end', v)}
+                                        className="flex-1 min-w-[36px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-400 active:bg-[#333] cursor-pointer"
+                                    >
+                                        {v > 0 ? '+' : ''}{v}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setNow('end')}
+                                    className="flex-1 min-w-[48px] py-1.5 rounded-lg border border-[#2a2a2a] bg-[#171717] text-xs font-semibold text-gray-300 active:bg-[#333] cursor-pointer"
+                                >
+                                    {t('editRecord.now')}
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* ── Activity Selector (Collapsible Accordion Grid) ── */}
@@ -403,7 +486,7 @@ export default function EditRecordScreen({ record, onClose }: EditRecordScreenPr
                     onClick={handleSave}
                     className="w-full bg-[#1c1c1c] hover:bg-[#2a2a2a] py-4 rounded-[14px] text-gray-300 font-bold text-sm tracking-widest uppercase active:scale-[0.98] transition-all cursor-pointer"
                 >
-                    {t('common.save')}
+                    {record.isRunning && !isStillRunning ? t('editRecord.saveAndFinish') : t('common.save')}
                 </button>
             </div>
         </motion.div>

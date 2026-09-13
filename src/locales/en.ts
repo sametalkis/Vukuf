@@ -178,6 +178,13 @@ export default {
   'editRecord.now': 'Now',
   'editRecord.running': 'Running',
   'editRecord.active': 'Active',
+  'editRecord.stopTimer': 'Stop Timer',
+  'editRecord.finishSession': 'Set End Time',
+  'editRecord.keepRunning': 'Still Running',
+  'editRecord.saveAndFinish': 'Finish and Save',
+  'editRecord.currentlyRunning': 'Activity is running',
+  'editRecord.sessionEnded': 'Activity ended',
+  'editRecord.stopTimerHint': 'You can edit the category/start time, stop the timer, or set an end time.',
 
   // Split Record
   'editRecord.splitRecord': 'Split Record',

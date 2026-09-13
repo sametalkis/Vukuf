@@ -470,6 +470,15 @@ export default function RecordsScreen() {
         const storeRecord = records.find(r => r.id === target.id);
         if (storeRecord) {
             setEditingRecord(storeRecord);
+        } else if (runningRecord && (target.id === runningRecord.id || target.isRunning)) {
+            setEditingRecord({
+                id: runningRecord.id,
+                recordTypeId: runningRecord.recordTypeId,
+                startTime: runningRecord.startTime,
+                endTime: new Date().toISOString(),
+                duration: Math.floor((Date.now() - new Date(runningRecord.startTime).getTime()) / 1000),
+                isRunning: true,
+            });
         } else if (target.id.startsWith('untracked-')) {
             // Dynamically computed untracked block converted to editable draft
             setEditingRecord({

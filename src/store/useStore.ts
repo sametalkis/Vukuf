@@ -173,7 +173,34 @@ export const useStore = create<TimeTrackerStore>()(
             updateRecord: (id, data) => {
                 set((s) => {
                     if (s.runningRecord?.id === id) {
-                        return { runningRecord: { ...s.runningRecord, ...data } };
+                        // If endTime is provided, convert running session to completed record
+                        if (data.endTime) {
+                            const sTime = data.startTime || s.runningRecord.startTime;
+                            const eTime = data.endTime;
+                            const dur = durationSeconds(sTime, eTime);
+                            const completedRecord: Record = {
+                                id: s.runningRecord.id,
+                                recordTypeId: data.recordTypeId || s.runningRecord.recordTypeId,
+                                startTime: sTime,
+                                endTime: eTime,
+                                duration: dur,
+                            };
+                            let newRunning = null;
+                            if (s.showUntrackedTime && completedRecord.recordTypeId !== 'untracked') {
+                                newRunning = { id: uuidv4(), recordTypeId: 'untracked', startTime: eTime };
+                            }
+                            return {
+                                records: [...s.records, completedRecord],
+                                runningRecord: newRunning,
+                            };
+                        }
+                        return {
+                            runningRecord: {
+                                ...s.runningRecord,
+                                recordTypeId: data.recordTypeId || s.runningRecord.recordTypeId,
+                                startTime: data.startTime || s.runningRecord.startTime,
+                            }
+                        };
                     }
                     const exists = s.records.some((r) => r.id === id);
                     if (!exists && id.startsWith('untracked-')) {
@@ -202,7 +229,11 @@ export const useStore = create<TimeTrackerStore>()(
             deleteRecord: (id) => {
                 set((s) => {
                     if (s.runningRecord?.id === id) {
-                        return { runningRecord: null };
+                        let newRunning = null;
+                        if (s.showUntrackedTime && s.runningRecord.recordTypeId !== 'untracked') {
+                            newRunning = { id: uuidv4(), recordTypeId: 'untracked', startTime: now() };
+                        }
+                        return { runningRecord: newRunning };
                     }
                     return { records: s.records.filter((r) => r.id !== id) };
                 });
